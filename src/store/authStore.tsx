@@ -12,10 +12,13 @@ import {
   clearSession,
   login as apiLogin,
   logout as apiLogout,
+  register as apiRegister,
   readSession,
   saveSession,
   type AuthUser,
+  type RegisterPayload,
 } from '@/api/authApi';
+
 
 // ─── Context shape ─────────────────────────────────────────────────────────
 
@@ -26,9 +29,12 @@ interface AuthContextValue {
   isLoading: boolean;
   /** Signs in with email + password, persists the session, and sets user. */
   signIn: (email: string, password: string) => Promise<void>;
+  /** Registers a new passenger account, persists the session, and sets user. */
+  signUp: (payload: RegisterPayload) => Promise<void>;
   /** Signs out: calls the backend logout, clears SecureStore, nullifies user. */
   signOut: () => Promise<void>;
 }
+
 
 // ─── Context ──────────────────────────────────────────────────────────────
 
@@ -65,15 +71,22 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setUser(session.user);
   }, []);
 
+  const signUp = useCallback(async (payload: RegisterPayload) => {
+    const session = await apiRegister(payload);
+    await saveSession(session);
+    setUser(session.user);
+  }, []);
+
   const signOut = useCallback(async () => {
     await apiLogout();   // clears SecureStore internally
     setUser(null);
   }, []);
 
   const value = useMemo<AuthContextValue>(
-    () => ({ user, isLoading, signIn, signOut }),
-    [user, isLoading, signIn, signOut],
+    () => ({ user, isLoading, signIn, signUp, signOut }),
+    [user, isLoading, signIn, signUp, signOut],
   );
+
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
