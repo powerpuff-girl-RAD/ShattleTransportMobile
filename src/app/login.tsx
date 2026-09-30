@@ -3,6 +3,7 @@ import { useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   View,
@@ -10,9 +11,10 @@ import {
 
 import { BrandLogo } from '@/components/BrandLogo';
 import { Button, Input, Screen, Text } from '@/components/ui';
-import { Layout, Spacing } from '@/constants/theme';
+import { Colors, Layout, Spacing } from '@/constants/theme';
 import { useAuth } from '@/store/authStore';
 import { getErrorMessage } from '@/utils/api';
+
 
 /**
  * Login screen
@@ -145,6 +147,18 @@ export default function Login() {
               label="← Back to start"
               onPress={() => router.replace('/onboarding')}
             />
+
+            {/* ── Registration link ─────────────────────────────── */}
+            <View style={styles.registerRow}>
+              <Text variant="caption" color={Colors.textSecondary}>
+                Don't have an account?{' '}
+              </Text>
+              <Pressable onPress={() => router.push('/register')} hitSlop={6}>
+                <Text variant="caption" color={Colors.orange} style={styles.registerLink}>
+                  Register
+                </Text>
+              </Pressable>
+            </View>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -181,4 +195,14 @@ const styles = StyleSheet.create({
   signInButton: {
     marginTop: Spacing.two,
   },
+  registerRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: Spacing.two,
+  },
+  registerLink: {
+    fontWeight: '600',
+  },
 });
+

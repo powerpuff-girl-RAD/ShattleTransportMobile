@@ -37,14 +37,26 @@ export const Colors = {
   error: '#E53935',
   success: '#0DC87A',
 
-  // Glass / overlay surfaces
+  // Glass / overlay surfaces (gradient / dark backgrounds)
   glass: 'rgba(0,0,0,0.22)',
   glassBorder: 'rgba(255,255,255,0.18)',
   inputBg: 'rgba(255,255,255,0.12)',
   inputBorder: 'rgba(255,255,255,0.28)',
   inputFocused: 'rgba(255,255,255,0.55)',
   overlay: 'rgba(0,0,0,0.45)',
+
+  // Light-surface tokens (registration / settings — white background screens)
+  surfaceLight: '#F2F3F8',
+  inputLightBg: '#FFFFFF',
+  inputLightBorder: '#D8DDE6',
+  inputLightFocused: '#E07820',   // orange — matches primary CTA
+  inputLightText: '#1A1A2E',
+  inputLightPlaceholder: '#A0A4B8',
+  inputLightLabel: '#5A5E78',
+  textDark: '#1A1A2E',   // headings on light surfaces
+  textDarkSecondary: '#5A5E78',   // body / secondary on light surfaces
 } as const;
+
 
 // ─── Gradient Config ──────────────────────────────────────────────────────
 export const Gradient = {

@@ -1,5 +1,6 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
-import * as SecureStore from "expo-secure-store";
+import * as storage from "@/utils/secureStorage";
+
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL;
 
@@ -22,7 +23,7 @@ export const apiClient = axios.create({
 // ─── Request interceptor — attach Bearer token automatically ─────────────
 apiClient.interceptors.request.use(
     async (config: InternalAxiosRequestConfig) => {
-        const token = await SecureStore.getItemAsync(SECURE_STORE_KEYS.ACCESS_TOKEN);
+        const token = await storage.getItem(SECURE_STORE_KEYS.ACCESS_TOKEN);
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
         }
@@ -71,7 +72,7 @@ apiClient.interceptors.response.use(
             isRefreshing = true;
 
             try {
-                const refreshToken = await SecureStore.getItemAsync(SECURE_STORE_KEYS.REFRESH_TOKEN);
+                const refreshToken = await storage.getItem(SECURE_STORE_KEYS.REFRESH_TOKEN);
                 if (!refreshToken) throw new Error("No refresh token stored");
 
                 const { data } = await axios.post(
@@ -82,8 +83,8 @@ apiClient.interceptors.response.use(
                 const newAccessToken: string = data.accessToken;
                 const newRefreshToken: string = data.refreshToken;
 
-                await SecureStore.setItemAsync(SECURE_STORE_KEYS.ACCESS_TOKEN, newAccessToken);
-                await SecureStore.setItemAsync(SECURE_STORE_KEYS.REFRESH_TOKEN, newRefreshToken);
+                await storage.setItem(SECURE_STORE_KEYS.ACCESS_TOKEN, newAccessToken);
+                await storage.setItem(SECURE_STORE_KEYS.REFRESH_TOKEN, newRefreshToken);
 
                 apiClient.defaults.headers.common.Authorization = `Bearer ${newAccessToken}`;
                 processQueue(null, newAccessToken);
@@ -93,9 +94,9 @@ apiClient.interceptors.response.use(
             } catch (refreshError) {
                 processQueue(refreshError, null);
                 // Clear stored credentials so the app redirects to login
-                await SecureStore.deleteItemAsync(SECURE_STORE_KEYS.ACCESS_TOKEN);
-                await SecureStore.deleteItemAsync(SECURE_STORE_KEYS.REFRESH_TOKEN);
-                await SecureStore.deleteItemAsync(SECURE_STORE_KEYS.USER);
+                await storage.deleteItem(SECURE_STORE_KEYS.ACCESS_TOKEN);
+                await storage.deleteItem(SECURE_STORE_KEYS.REFRESH_TOKEN);
+                await storage.deleteItem(SECURE_STORE_KEYS.USER);
                 return Promise.reject(refreshError);
             } finally {
                 isRefreshing = false;
