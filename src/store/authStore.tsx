@@ -18,6 +18,7 @@ import {
   type AuthUser,
   type RegisterPayload,
 } from '@/api/authApi';
+import { apiClient } from '@/api/apiClient';
 
 
 // ─── Context shape ─────────────────────────────────────────────────────────
@@ -55,7 +56,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
     (async () => {
       try {
         const session = await readSession();
-        if (session) setUser(session.user);
+        if (session) {
+          // Re-hydrate the in-memory default header so all subsequent API calls
+          // (including logout) include the Bearer token after a page refresh.
+          apiClient.defaults.headers.common['Authorization'] = `Bearer ${session.accessToken}`;
+          setUser(session.user);
+        }
       } catch {
         // Corrupted storage — treat as logged out
         await clearSession();
@@ -64,6 +70,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
     })();
   }, []);
+
 
   const signIn = useCallback(async (email: string, password: string) => {
     const session = await apiLogin({ email, password });

@@ -84,8 +84,8 @@ export function Input({
           {...rest}
         />
 
-        {rightIcon && (
-          <View style={styles.iconWrapper} pointerEvents="box-none">
+        {rightIcon != null && (
+          <View style={styles.iconWrapper}>
             {rightIcon}
           </View>
         )}
@@ -174,6 +174,8 @@ const styles = StyleSheet.create({
     top: 0,
     bottom: 0,
     justifyContent: 'center',
+    // 'box-none' lets touches pass through the wrapper to the TextInput behind it
+    pointerEvents: 'box-none' as 'box-none',
   },
 
   // ── Error message ──
