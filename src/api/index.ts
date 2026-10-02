@@ -1,9 +1,9 @@
-/**
+﻿/**
  * Central barrel export for all API services.
  *
  * Usage:
- *   import { login, getRoutes, getSchedules } from '@/api';
- *   import type { AuthUser, Route, Schedule } from '@/api';
+ *   import { login, getRoutes, getSchedules, topUpAccount } from '@/api';
+ *   import type { AuthUser, Route, Schedule, TopUpResponse } from '@/api';
  */
 
 // Core client & token keys
@@ -90,16 +90,22 @@ export type {
 export { checkHealth } from "./healthApi";
 export type { HealthStatus } from "./healthApi";
 
-// Passenger profile
+// Passenger profile & wallet
 export {
     getMyProfile,
     updateMyProfile,
     changePassword,
+    topUpAccount,
+    getTopUpHistory,
+    getTopUpReceipt,
 } from "./passengerApi";
 export type {
     PassengerProfileData,
     PassengerAccount,
     UpdateProfilePayload,
+    TopUpPayload,
+    TopUpTransaction,
+    TopUpResponse,
 } from "./passengerApi";
 
 // Digital token

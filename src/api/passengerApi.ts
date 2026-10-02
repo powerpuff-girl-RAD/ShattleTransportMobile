@@ -1,4 +1,4 @@
-import { apiClient } from './apiClient';
+﻿import { apiClient } from './apiClient';
 
 // ─── Types ────────────────────────────────────────────────────────────────
 
@@ -31,6 +31,36 @@ export interface UpdateProfilePayload {
     nic?: string;
 }
 
+export interface TopUpPayload {
+    amount: number;
+    paymentMethod?: 'Debit Card' | 'Credit Card';
+    cardNumber: string;
+    expiry?: string;
+    cvv?: string;
+    cardholderName?: string;
+}
+
+export interface TopUpTransaction {
+    id: number;
+    transactionRef: string;
+    amount: number;
+    currency: string;
+    paymentMethod: string;
+    cardLast4?: string;
+    cardType?: string;
+    cardholderName?: string;
+    status: string;
+    createdAt: string;
+}
+
+export interface TopUpResponse {
+    success: boolean;
+    message: string;
+    transaction: TopUpTransaction;
+    previousBalance: number;
+    newBalance: number;
+}
+
 // ─── Profile API ──────────────────────────────────────────────────────────
 
 /** Fetches the authenticated passenger's full profile including account balance. */
@@ -58,3 +88,29 @@ export async function changePassword(
     await apiClient.put('/passenger/password', { currentPassword, newPassword });
 }
 
+// ─── Top-Up API ───────────────────────────────────────────────────────────
+
+/** Submits a top-up transaction via card payment gateway. */
+export async function topUpAccount(payload: TopUpPayload): Promise<TopUpResponse> {
+    const res = await apiClient.post<TopUpResponse>(
+        '/passenger/topup',
+        payload
+    );
+    return res.data;
+}
+
+/** Retrieves top-up history. */
+export async function getTopUpHistory(limit: number = 20): Promise<TopUpTransaction[]> {
+    const res = await apiClient.get<{ success: boolean; history: TopUpTransaction[] }>(
+        `/passenger/topup/history?limit=${limit}`
+    );
+    return res.data.history;
+}
+
+/** Retrieves single transaction receipt. */
+export async function getTopUpReceipt(ref: string): Promise<TopUpTransaction & { currentBalance: number }> {
+    const res = await apiClient.get<{ success: boolean; receipt: TopUpTransaction & { currentBalance: number } }>(
+        `/passenger/topup/${ref}`
+    );
+    return res.data.receipt;
+}

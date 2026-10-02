@@ -1,6 +1,6 @@
-import React, { useCallback, useEffect } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { Text } from '@/components/ui';
+﻿import React, { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ConfirmationModal, Text } from '@/components/ui';
 import { TokenSummaryCard } from '@/components/passenger/TokenSummaryCard';
 import { QuickActionTile } from '@/components/passenger/QuickActionTile';
 import { Colors, FontSize, FontWeight, Radius, Shadow, Spacing } from '@/constants/theme';
@@ -11,25 +11,30 @@ import { router } from 'expo-router';
 export default function PassengerHome() {
     const { user, signOut } = useAuth();
     const { profile, token, isLoading, loadProfile, loadToken } = usePassenger();
+    const [showLogoutModal, setShowLogoutModal] = useState(false);
+    const [isLoggingOut, setIsLoggingOut] = useState(false);
 
     useEffect(() => { loadProfile(); loadToken(); }, []);
 
-    const goToTickets = useCallback(() => router.replace('/passenger/tickets'), []);
-    const goToBuy = useCallback(() => router.replace('/passenger/buy'), []);
+    const goToTickets = useCallback(() => router.push('/passenger/tickets'), []);
+    const goToBuy = useCallback(() => router.push('/passenger/buy'), []);
+    const goToTopUp = useCallback(() => router.push('/passenger/topup'), []);
 
-    const handleSignOut = useCallback(() => {
-        Alert.alert(
-            'Sign Out',
-            'Are you sure you want to sign out?',
-            [
-                { text: 'Cancel', style: 'cancel' },
-                { text: 'Sign Out', style: 'destructive', onPress: () => signOut() },
-            ]
-        );
+    const handleConfirmLogout = useCallback(async () => {
+        setIsLoggingOut(true);
+        try {
+            await signOut();
+            setShowLogoutModal(false);
+            router.replace('/login');
+        } catch (error) {
+            console.error('Logout error:', error);
+        } finally {
+            setIsLoggingOut(false);
+        }
     }, [signOut]);
 
     const displayName = profile?.fullName || user?.email || 'Passenger';
-    const balance = profile?.account.balance ?? null;
+    const balance = profile?.account?.balance ?? null;
 
     return (
         <View style={styles.root}>
@@ -49,9 +54,9 @@ export default function PassengerHome() {
                 {/* Right: balance pill + notification + sign-out */}
                 <View style={styles.headerRight}>
                     {balance !== null && (
-                        <View style={styles.balancePill}>
-                            <Text style={styles.balanceText}>LKR {balance.toFixed(2)}</Text>
-                        </View>
+                        <Pressable style={styles.balancePill} onPress={goToTopUp}>
+                            <Text style={styles.balanceText}>LKR {balance.toLocaleString('en-LK', { minimumFractionDigits: 2 })}</Text>
+                        </Pressable>
                     )}
 
                     {/* Notification icon */}
@@ -67,7 +72,7 @@ export default function PassengerHome() {
                     {/* Sign-out icon */}
                     <Pressable
                         style={styles.iconBtn}
-                        onPress={handleSignOut}
+                        onPress={() => setShowLogoutModal(true)}
                         accessibilityRole="button"
                         accessibilityLabel="Sign out"
                     >
@@ -87,7 +92,7 @@ export default function PassengerHome() {
                 <Text style={styles.sectionTitle}>Quick actions</Text>
                 <View style={styles.quickRow}>
                     <QuickActionTile icon={<Text style={styles.quickIcon}>＋</Text>} label="Buy a token" onPress={goToBuy} />
-                    <QuickActionTile icon={<Text style={styles.quickIcon}>🎫</Text>} label="My tickets" onPress={goToTickets} />
+                    <QuickActionTile icon={<Text style={styles.quickIcon}>💳</Text>} label="Top-up" onPress={goToTopUp} />
                     <QuickActionTile icon={<Text style={styles.quickIcon}>QR</Text>} label="Show QR" onPress={goToTickets} />
                 </View>
 
@@ -104,6 +109,19 @@ export default function PassengerHome() {
                     </Text>
                 </View>
             </ScrollView>
+
+            {/* ── Logout Confirmation Popup ─────────────────────────── */}
+            <ConfirmationModal
+                visible={showLogoutModal}
+                title="Sign Out"
+                message="Are you sure you want to sign out of your account?"
+                confirmLabel="Yes"
+                cancelLabel="No"
+                isDestructive={true}
+                isLoading={isLoggingOut}
+                onConfirm={handleConfirmLogout}
+                onCancel={() => setShowLogoutModal(false)}
+            />
         </View>
     );
 }

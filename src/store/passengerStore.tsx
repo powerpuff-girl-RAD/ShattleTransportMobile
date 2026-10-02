@@ -1,16 +1,34 @@
-import React, {
+﻿import React, {
     createContext,
     useCallback,
     useContext,
-    useEffect,
     useMemo,
     useReducer,
 } from 'react';
 
-import { getMyProfile, updateMyProfile, changePassword as apiChangePassword } from '@/api/passengerApi';
-import { getActiveToken, activateToken as apiActivateToken, generateQR, deactivateToken as apiDeactivateToken } from '@/api/tokenApi';
-import type { PassengerProfileData, UpdateProfilePayload } from '@/api/passengerApi';
-import type { DigitalToken, QRGenerationResult, ActivateTokenPayload } from '@/api/tokenApi';
+import {
+    getMyProfile,
+    updateMyProfile,
+    changePassword as apiChangePassword,
+    topUpAccount as apiTopUpAccount,
+} from '@/api/passengerApi';
+import {
+    getActiveToken,
+    activateToken as apiActivateToken,
+    generateQR,
+    deactivateToken as apiDeactivateToken,
+} from '@/api/tokenApi';
+import type {
+    PassengerProfileData,
+    UpdateProfilePayload,
+    TopUpPayload,
+    TopUpResponse,
+} from '@/api/passengerApi';
+import type {
+    DigitalToken,
+    QRGenerationResult,
+    ActivateTokenPayload,
+} from '@/api/tokenApi';
 
 // ─── State ────────────────────────────────────────────────────────────────
 
@@ -36,6 +54,7 @@ type Action =
     | { type: 'SET_LOADING'; payload: boolean }
     | { type: 'SET_TOKEN_LOADING'; payload: boolean }
     | { type: 'SET_PROFILE'; payload: PassengerProfileData }
+    | { type: 'SET_BALANCE'; payload: number }
     | { type: 'SET_TOKEN'; payload: DigitalToken | null }
     | { type: 'SET_QR'; payload: QRGenerationResult | null }
     | { type: 'SET_ERROR'; payload: string | null }
@@ -46,6 +65,18 @@ function reducer(state: PassengerState, action: Action): PassengerState {
         case 'SET_LOADING': return { ...state, isLoading: action.payload, error: null };
         case 'SET_TOKEN_LOADING': return { ...state, tokenLoading: action.payload };
         case 'SET_PROFILE': return { ...state, profile: action.payload, isLoading: false };
+        case 'SET_BALANCE':
+            if (!state.profile) return state;
+            return {
+                ...state,
+                profile: {
+                    ...state.profile,
+                    account: {
+                        ...state.profile.account,
+                        balance: action.payload,
+                    },
+                },
+            };
         case 'SET_TOKEN': return { ...state, token: action.payload, tokenLoading: false };
         case 'SET_QR': return { ...state, qr: action.payload, tokenLoading: false };
         case 'SET_ERROR': return { ...state, error: action.payload, isLoading: false, tokenLoading: false };
@@ -64,6 +95,7 @@ interface PassengerContextValue extends PassengerState {
     activateToken: (payload: ActivateTokenPayload) => Promise<string>;
     refreshQR: () => Promise<void>;
     deactivateToken: () => Promise<void>;
+    topUpWallet: (payload: TopUpPayload) => Promise<TopUpResponse>;
     clearError: () => void;
 }
 
@@ -118,7 +150,6 @@ export function PassengerProvider({ children }: { children: React.ReactNode }) {
             const token = await getActiveToken();
             dispatch({ type: 'SET_TOKEN', payload: token });
         } catch (err: any) {
-            // 404 means no token yet — not an error state
             if (err?.response?.status === 404) {
                 dispatch({ type: 'SET_TOKEN', payload: null });
             } else {
@@ -169,6 +200,21 @@ export function PassengerProvider({ children }: { children: React.ReactNode }) {
         }
     }, [state.token]);
 
+    /** Process Top-Up Payment */
+    const topUpWallet = useCallback(async (payload: TopUpPayload): Promise<TopUpResponse> => {
+        dispatch({ type: 'SET_LOADING', payload: true });
+        try {
+            const res = await apiTopUpAccount(payload);
+            dispatch({ type: 'SET_BALANCE', payload: res.newBalance });
+            dispatch({ type: 'SET_LOADING', payload: false });
+            return res;
+        } catch (err: any) {
+            const msg = err?.response?.data?.message || 'Top-up transaction failed';
+            dispatch({ type: 'SET_ERROR', payload: msg });
+            throw err;
+        }
+    }, []);
+
     const clearError = useCallback(() => dispatch({ type: 'SET_ERROR', payload: null }), []);
 
     const value = useMemo<PassengerContextValue>(
@@ -181,6 +227,7 @@ export function PassengerProvider({ children }: { children: React.ReactNode }) {
             activateToken,
             refreshQR,
             deactivateToken,
+            topUpWallet,
             clearError,
         }),
         // eslint-disable-next-line react-hooks/exhaustive-deps
