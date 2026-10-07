@@ -122,3 +122,24 @@ export type {
     QRGenerationResult,
     ActivateTokenPayload,
 } from "./tokenApi";
+// Journey & Ticketing
+export {
+    boardJourney,
+    alightJourney,
+    getActiveJourney,
+    getJourneyHistory,
+    getFareEstimate,
+    getNotifications,
+    markNotificationRead,
+} from "./journeyApi";
+export type {
+    Journey,
+    JourneyStopInfo,
+    BoardingPayload,
+    BoardingResult,
+    AlightingPayload,
+    AlightingResult,
+    FareEstimatePayload,
+    FareEstimateResult,
+    NotificationItem,
+} from "./journeyApi";

@@ -18,6 +18,12 @@ import {
     generateQR,
     deactivateToken as apiDeactivateToken,
 } from '@/api/tokenApi';
+import {
+    getActiveJourney as apiGetActiveJourney,
+    boardJourney as apiBoardJourney,
+    alightJourney as apiAlightJourney,
+    getNotifications as apiGetNotifications,
+} from '@/api/journeyApi';
 import type {
     PassengerProfileData,
     UpdateProfilePayload,
@@ -29,6 +35,14 @@ import type {
     QRGenerationResult,
     ActivateTokenPayload,
 } from '@/api/tokenApi';
+import type {
+    Journey,
+    BoardingPayload,
+    BoardingResult,
+    AlightingPayload,
+    AlightingResult,
+    NotificationItem,
+} from '@/api/journeyApi';
 
 // ─── State ────────────────────────────────────────────────────────────────
 
@@ -36,8 +50,11 @@ interface PassengerState {
     profile: PassengerProfileData | null;
     token: DigitalToken | null;
     qr: QRGenerationResult | null;
+    activeJourney: Journey | null;
+    notifications: NotificationItem[];
     isLoading: boolean;
     tokenLoading: boolean;
+    journeyLoading: boolean;
     error: string | null;
 }
 
@@ -45,18 +62,24 @@ const initialState: PassengerState = {
     profile: null,
     token: null,
     qr: null,
+    activeJourney: null,
+    notifications: [],
     isLoading: false,
     tokenLoading: false,
+    journeyLoading: false,
     error: null,
 };
 
 type Action =
     | { type: 'SET_LOADING'; payload: boolean }
     | { type: 'SET_TOKEN_LOADING'; payload: boolean }
+    | { type: 'SET_JOURNEY_LOADING'; payload: boolean }
     | { type: 'SET_PROFILE'; payload: PassengerProfileData }
     | { type: 'SET_BALANCE'; payload: number }
     | { type: 'SET_TOKEN'; payload: DigitalToken | null }
     | { type: 'SET_QR'; payload: QRGenerationResult | null }
+    | { type: 'SET_ACTIVE_JOURNEY'; payload: Journey | null }
+    | { type: 'SET_NOTIFICATIONS'; payload: NotificationItem[] }
     | { type: 'SET_ERROR'; payload: string | null }
     | { type: 'CLEAR' };
 
@@ -64,6 +87,7 @@ function reducer(state: PassengerState, action: Action): PassengerState {
     switch (action.type) {
         case 'SET_LOADING': return { ...state, isLoading: action.payload, error: null };
         case 'SET_TOKEN_LOADING': return { ...state, tokenLoading: action.payload };
+        case 'SET_JOURNEY_LOADING': return { ...state, journeyLoading: action.payload };
         case 'SET_PROFILE': return { ...state, profile: action.payload, isLoading: false };
         case 'SET_BALANCE':
             if (!state.profile) return state;
@@ -79,7 +103,9 @@ function reducer(state: PassengerState, action: Action): PassengerState {
             };
         case 'SET_TOKEN': return { ...state, token: action.payload, tokenLoading: false };
         case 'SET_QR': return { ...state, qr: action.payload, tokenLoading: false };
-        case 'SET_ERROR': return { ...state, error: action.payload, isLoading: false, tokenLoading: false };
+        case 'SET_ACTIVE_JOURNEY': return { ...state, activeJourney: action.payload, journeyLoading: false };
+        case 'SET_NOTIFICATIONS': return { ...state, notifications: action.payload };
+        case 'SET_ERROR': return { ...state, error: action.payload, isLoading: false, tokenLoading: false, journeyLoading: false };
         case 'CLEAR': return initialState;
         default: return state;
     }
@@ -96,6 +122,10 @@ interface PassengerContextValue extends PassengerState {
     refreshQR: () => Promise<void>;
     deactivateToken: () => Promise<void>;
     topUpWallet: (payload: TopUpPayload) => Promise<TopUpResponse>;
+    loadActiveJourney: () => Promise<void>;
+    boardJourney: (payload: BoardingPayload) => Promise<BoardingResult>;
+    alightJourney: (payload: AlightingPayload) => Promise<AlightingResult>;
+    loadNotifications: () => Promise<void>;
     clearError: () => void;
 }
 
@@ -130,7 +160,7 @@ export function PassengerProvider({ children }: { children: React.ReactNode }) {
         }
     }, []);
 
-    /** Change password — throws on failure so the screen can show the error. */
+    /** Change password. */
     const changePassword = useCallback(async (current: string, next: string) => {
         dispatch({ type: 'SET_LOADING', payload: true });
         try {
@@ -143,7 +173,7 @@ export function PassengerProvider({ children }: { children: React.ReactNode }) {
         }
     }, []);
 
-    /** Load the passenger's active token. */
+    /** Load active token. */
     const loadToken = useCallback(async () => {
         dispatch({ type: 'SET_TOKEN_LOADING', payload: true });
         try {
@@ -158,7 +188,7 @@ export function PassengerProvider({ children }: { children: React.ReactNode }) {
         }
     }, []);
 
-    /** Activate (link) a new token serial. Returns the success message. */
+    /** Activate token. */
     const activateToken = useCallback(async (payload: ActivateTokenPayload): Promise<string> => {
         dispatch({ type: 'SET_TOKEN_LOADING', payload: true });
         try {
@@ -172,7 +202,7 @@ export function PassengerProvider({ children }: { children: React.ReactNode }) {
         }
     }, []);
 
-    /** Fetch a fresh QR JWT from the backend (called on mount and on "Refresh" tap). */
+    /** Refresh QR JWT token. */
     const refreshQR = useCallback(async () => {
         dispatch({ type: 'SET_TOKEN_LOADING', payload: true });
         try {
@@ -185,7 +215,7 @@ export function PassengerProvider({ children }: { children: React.ReactNode }) {
         }
     }, []);
 
-    /** Deactivate the passenger's active token. */
+    /** Deactivate token. */
     const deactivateToken = useCallback(async () => {
         if (!state.token) return;
         dispatch({ type: 'SET_TOKEN_LOADING', payload: true });
@@ -215,6 +245,63 @@ export function PassengerProvider({ children }: { children: React.ReactNode }) {
         }
     }, []);
 
+    /** Load currently active journey */
+    const loadActiveJourney = useCallback(async () => {
+        dispatch({ type: 'SET_JOURNEY_LOADING', payload: true });
+        try {
+            const active = await apiGetActiveJourney();
+            dispatch({ type: 'SET_ACTIVE_JOURNEY', payload: active });
+        } catch {
+            dispatch({ type: 'SET_JOURNEY_LOADING', payload: false });
+        }
+    }, []);
+
+    /** Board journey (tap in) */
+    const boardJourney = useCallback(async (payload: BoardingPayload): Promise<BoardingResult> => {
+        dispatch({ type: 'SET_JOURNEY_LOADING', payload: true });
+        try {
+            const result = await apiBoardJourney(payload);
+            if (result.status === 'Accepted' && result.journey) {
+                dispatch({ type: 'SET_ACTIVE_JOURNEY', payload: result.journey });
+            }
+            dispatch({ type: 'SET_JOURNEY_LOADING', payload: false });
+            return result;
+        } catch (err: any) {
+            const resData = err?.response?.data;
+            dispatch({ type: 'SET_JOURNEY_LOADING', payload: false });
+            if (resData && resData.status === 'Rejected') {
+                return resData as BoardingResult;
+            }
+            throw err;
+        }
+    }, []);
+
+    /** Alight journey (tap out) */
+    const alightJourney = useCallback(async (payload: AlightingPayload): Promise<AlightingResult> => {
+        dispatch({ type: 'SET_JOURNEY_LOADING', payload: true });
+        try {
+            const result = await apiAlightJourney(payload);
+            dispatch({ type: 'SET_ACTIVE_JOURNEY', payload: null });
+            dispatch({ type: 'SET_BALANCE', payload: result.newBalance });
+            dispatch({ type: 'SET_JOURNEY_LOADING', payload: false });
+            return result;
+        } catch (err: any) {
+            const msg = err?.response?.data?.message || 'Failed to complete journey tap-out';
+            dispatch({ type: 'SET_ERROR', payload: msg });
+            throw err;
+        }
+    }, []);
+
+    /** Load notifications */
+    const loadNotifications = useCallback(async () => {
+        try {
+            const list = await apiGetNotifications();
+            dispatch({ type: 'SET_NOTIFICATIONS', payload: list });
+        } catch {
+            // ignore
+        }
+    }, []);
+
     const clearError = useCallback(() => dispatch({ type: 'SET_ERROR', payload: null }), []);
 
     const value = useMemo<PassengerContextValue>(
@@ -228,6 +315,10 @@ export function PassengerProvider({ children }: { children: React.ReactNode }) {
             refreshQR,
             deactivateToken,
             topUpWallet,
+            loadActiveJourney,
+            boardJourney,
+            alightJourney,
+            loadNotifications,
             clearError,
         }),
         // eslint-disable-next-line react-hooks/exhaustive-deps
