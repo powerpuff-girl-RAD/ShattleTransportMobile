@@ -1,5 +1,12 @@
 ﻿import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import {
+    ActivityIndicator,
+    Alert,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    View,
+} from 'react-native';
 import { ConfirmationModal, Text } from '@/components/ui';
 import { TokenSummaryCard } from '@/components/passenger/TokenSummaryCard';
 import { QuickActionTile } from '@/components/passenger/QuickActionTile';
@@ -10,15 +17,32 @@ import { router } from 'expo-router';
 
 export default function PassengerHome() {
     const { user, signOut } = useAuth();
-    const { profile, token, isLoading, loadProfile, loadToken } = usePassenger();
+    const {
+        profile,
+        token,
+        activeJourney,
+        notifications,
+        isLoading,
+        loadProfile,
+        loadToken,
+        loadActiveJourney,
+        loadNotifications,
+    } = usePassenger();
+
     const [showLogoutModal, setShowLogoutModal] = useState(false);
     const [isLoggingOut, setIsLoggingOut] = useState(false);
 
-    useEffect(() => { loadProfile(); loadToken(); }, []);
+    useEffect(() => {
+        loadProfile();
+        loadToken();
+        loadActiveJourney();
+        loadNotifications();
+    }, [loadProfile, loadToken, loadActiveJourney, loadNotifications]);
 
     const goToTickets = useCallback(() => router.push('/passenger/tickets'), []);
     const goToBuy = useCallback(() => router.push('/passenger/buy'), []);
     const goToTopUp = useCallback(() => router.push('/passenger/topup'), []);
+    const goToScanner = useCallback(() => router.push('/passenger/gate-scanner'), []);
 
     const handleConfirmLogout = useCallback(async () => {
         setIsLoggingOut(true);
@@ -33,14 +57,25 @@ export default function PassengerHome() {
         }
     }, [signOut]);
 
+    const handleNotificationsPress = () => {
+        if (!notifications || notifications.length === 0) {
+            Alert.alert('Notifications', 'You have no new transit notifications at this time.');
+            return;
+        }
+
+        const latest = notifications.slice(0, 3).map((n) => `• ${n.title}: ${n.message}`).join('\n\n');
+        Alert.alert('Recent Notifications', latest, [{ text: 'Close' }]);
+    };
+
     const displayName = profile?.fullName || user?.email || 'Passenger';
     const balance = profile?.account?.balance ?? null;
+    const unreadCount = notifications.filter((n) => !n.isRead).length;
 
     return (
         <View style={styles.root}>
-            {/* ── Header ──────────────────────────────────────────────── */}
+            {/* ── Top Header ──────────────────────────────────────────── */}
             <View style={styles.topBar}>
-                {/* Left: avatar + name */}
+                {/* Left: Avatar + Name */}
                 <View style={styles.headerLeft}>
                     <View style={styles.avatar}>
                         <Text style={styles.avatarInitial}>{(displayName[0] ?? 'P').toUpperCase()}</Text>
@@ -51,25 +86,32 @@ export default function PassengerHome() {
                     </View>
                 </View>
 
-                {/* Right: balance pill + notification + sign-out */}
+                {/* Right: Balance Pill + Notifications + Sign-out */}
                 <View style={styles.headerRight}>
                     {balance !== null && (
                         <Pressable style={styles.balancePill} onPress={goToTopUp}>
-                            <Text style={styles.balanceText}>LKR {balance.toLocaleString('en-LK', { minimumFractionDigits: 2 })}</Text>
+                            <Text style={styles.balanceText}>
+                                LKR {balance.toLocaleString('en-LK', { minimumFractionDigits: 2 })}
+                            </Text>
                         </Pressable>
                     )}
 
-                    {/* Notification icon */}
+                    {/* Notification Icon */}
                     <Pressable
                         style={styles.iconBtn}
-                        onPress={() => { /* Notifications screen — coming in next sprint */ }}
+                        onPress={handleNotificationsPress}
                         accessibilityRole="button"
                         accessibilityLabel="Notifications"
                     >
                         <Text style={styles.iconBtnText}>🔔</Text>
+                        {unreadCount > 0 && (
+                            <View style={styles.badgeWrap}>
+                                <Text style={styles.badgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+                            </View>
+                        )}
                     </Pressable>
 
-                    {/* Sign-out icon */}
+                    {/* Sign-out Icon */}
                     <Pressable
                         style={styles.iconBtn}
                         onPress={() => setShowLogoutModal(true)}
@@ -82,32 +124,92 @@ export default function PassengerHome() {
             </View>
 
             <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-                {/* ── Active token card ────────────────────────────────── */}
-                {isLoading
-                    ? <ActivityIndicator color={Colors.orange} style={{ marginVertical: Spacing.six }} />
-                    : <TokenSummaryCard token={token} onPress={goToTickets} />
-                }
+                {/* ── Active Journey In Progress Banner ──────────────────── */}
+                {activeJourney && (
+                    <View style={styles.activeJourneyCard}>
+                        <View style={styles.activeJourneyHeader}>
+                            <View style={styles.activeBadge}>
+                                <Text style={styles.activeBadgeText}>IN PROGRESS</Text>
+                            </View>
+                            <Text style={styles.activeTime}>
+                                Boarded {new Date(activeJourney.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </Text>
+                        </View>
 
-                {/* ── Quick actions ────────────────────────────────────── */}
+                        <Text style={styles.activeRouteTitle}>
+                            Route {activeJourney.routeNumber} · {activeJourney.routeName}
+                        </Text>
+                        <Text style={styles.activeStopText}>
+                            Boarded at: {activeJourney.boardingStop.stopName}
+                        </Text>
+
+                        <Pressable style={styles.alightBtn} onPress={goToScanner}>
+                            <Text style={styles.alightBtnText}>Tap Out / Alight Bus →</Text>
+                        </Pressable>
+                    </View>
+                )}
+
+                {/* ── Active Token Card ────────────────────────────────── */}
+                {isLoading ? (
+                    <ActivityIndicator color={Colors.orange} style={{ marginVertical: Spacing.six }} />
+                ) : (
+                    <TokenSummaryCard token={token} onPress={goToTickets} />
+                )}
+
+                {/* ── Quick Actions ────────────────────────────────────── */}
                 <Text style={styles.sectionTitle}>Quick actions</Text>
                 <View style={styles.quickRow}>
-                    <QuickActionTile icon={<Text style={styles.quickIcon}>＋</Text>} label="Buy a token" onPress={goToBuy} />
-                    <QuickActionTile icon={<Text style={styles.quickIcon}>💳</Text>} label="Top-up" onPress={goToTopUp} />
-                    <QuickActionTile icon={<Text style={styles.quickIcon}>QR</Text>} label="Show QR" onPress={goToTickets} />
+                    <QuickActionTile
+                        icon={<Text style={styles.quickIcon}>🚌</Text>}
+                        label={activeJourney ? 'Tap Out Gate' : 'Board Gate'}
+                        onPress={goToScanner}
+                    />
+                    <QuickActionTile
+                        icon={<Text style={styles.quickIcon}>💳</Text>}
+                        label="Top-up"
+                        onPress={goToTopUp}
+                    />
+                    <QuickActionTile
+                        icon={<Text style={styles.quickIcon}>QR</Text>}
+                        label="Show QR"
+                        onPress={goToTickets}
+                    />
+                    <QuickActionTile
+                        icon={<Text style={styles.quickIcon}>🎟️</Text>}
+                        label="Passes"
+                        onPress={goToBuy}
+                    />
                 </View>
 
-                {/* ── Recent journeys ──────────────────────────────────── */}
+                {/* ── Recent Journeys Section ───────────────────────────── */}
                 <View style={styles.journeysHeader}>
                     <Text style={styles.sectionTitle}>Recent Journeys</Text>
-                    <View style={styles.addBtn}>
+                    <Pressable
+                        style={styles.addBtn}
+                        onPress={goToScanner}
+                        accessibilityLabel="Scan to board"
+                    >
                         <Text style={styles.addBtnText}>＋</Text>
+                    </Pressable>
+                </View>
+
+                {activeJourney ? (
+                    <View style={styles.journeyItemCard}>
+                        <View style={styles.journeyItemTop}>
+                            <Text style={styles.journeyItemRoute}>Route {activeJourney.routeNumber}</Text>
+                            <Text style={styles.journeyItemBadgeLive}>Live Trip</Text>
+                        </View>
+                        <Text style={styles.journeyItemDesc}>
+                            {activeJourney.boardingStop.stopName} → En Route
+                        </Text>
                     </View>
-                </View>
-                <View style={styles.emptyJourneys}>
-                    <Text style={styles.emptyText}>
-                        No journeys yet. Board a bus using your QR token to record your first trip.
-                    </Text>
-                </View>
+                ) : (
+                    <View style={styles.emptyJourneys}>
+                        <Text style={styles.emptyText}>
+                            No active journey. Scan your token at any transit gate to start traveling.
+                        </Text>
+                    </View>
+                )}
             </ScrollView>
 
             {/* ── Logout Confirmation Popup ─────────────────────────── */}
@@ -129,37 +231,156 @@ export default function PassengerHome() {
 const styles = StyleSheet.create({
     root: { flex: 1, backgroundColor: Colors.surfaceLight },
     topBar: {
-        flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-        backgroundColor: Colors.gradientTop,
-        paddingTop: 56, paddingBottom: Spacing.five, paddingHorizontal: Spacing.five,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        backgroundColor: '#0F6B56',
+        paddingTop: 56,
+        paddingBottom: Spacing.five,
+        paddingHorizontal: Spacing.five,
     },
     headerLeft: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
     headerRight: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
     avatar: {
-        width: 44, height: 44, borderRadius: 22,
-        backgroundColor: Colors.orange, alignItems: 'center', justifyContent: 'center',
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: Colors.orange,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     avatarInitial: { color: Colors.white, fontSize: FontSize.md, fontWeight: FontWeight.bold },
     welcomeText: { fontSize: FontSize.xs, color: 'rgba(255,255,255,0.7)' },
     nameText: { fontSize: FontSize.md, fontWeight: FontWeight.bold, color: Colors.white },
     balancePill: {
-        backgroundColor: 'rgba(255,255,255,0.18)', borderRadius: Radius.full,
-        paddingHorizontal: Spacing.three, paddingVertical: Spacing.one,
+        backgroundColor: 'rgba(255,255,255,0.18)',
+        borderRadius: Radius.full,
+        paddingHorizontal: Spacing.three,
+        paddingVertical: Spacing.one,
     },
     balanceText: { color: Colors.white, fontSize: FontSize.sm, fontWeight: FontWeight.semibold },
     iconBtn: {
-        width: 36, height: 36, borderRadius: 18,
+        width: 36,
+        height: 36,
+        borderRadius: 18,
         backgroundColor: 'rgba(255,255,255,0.18)',
-        alignItems: 'center', justifyContent: 'center',
+        alignItems: 'center',
+        justifyContent: 'center',
+        position: 'relative',
     },
     iconBtnText: { fontSize: 16 },
+    badgeWrap: {
+        position: 'absolute',
+        top: -2,
+        right: -2,
+        backgroundColor: '#EF4444',
+        borderRadius: 10,
+        minWidth: 16,
+        height: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 3,
+    },
+    badgeText: {
+        color: Colors.white,
+        fontSize: 10,
+        fontWeight: FontWeight.bold,
+    },
     scroll: { padding: Spacing.five, gap: Spacing.five, paddingBottom: Spacing.twelve },
+    activeJourneyCard: {
+        backgroundColor: '#0A3B32',
+        borderRadius: Radius.lg,
+        padding: Spacing.md,
+        ...Shadow.md,
+    },
+    activeJourneyHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 6,
+    },
+    activeBadge: {
+        backgroundColor: '#1FD186',
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        borderRadius: Radius.sm,
+    },
+    activeBadgeText: {
+        color: '#0A3B32',
+        fontSize: 10,
+        fontWeight: FontWeight.bold,
+    },
+    activeTime: {
+        color: 'rgba(255,255,255,0.7)',
+        fontSize: FontSize.xs,
+    },
+    activeRouteTitle: {
+        color: Colors.white,
+        fontSize: FontSize.md,
+        fontWeight: FontWeight.bold,
+        marginBottom: 2,
+    },
+    activeStopText: {
+        color: 'rgba(255,255,255,0.85)',
+        fontSize: FontSize.xs,
+        marginBottom: Spacing.sm,
+    },
+    alightBtn: {
+        backgroundColor: '#E67E22',
+        borderRadius: Radius.md,
+        paddingVertical: 8,
+        alignItems: 'center',
+    },
+    alightBtnText: {
+        color: Colors.white,
+        fontSize: FontSize.xs,
+        fontWeight: FontWeight.bold,
+    },
     sectionTitle: { fontSize: FontSize.md, fontWeight: FontWeight.bold, color: Colors.textDark },
-    quickRow: { flexDirection: 'row', gap: Spacing.three },
+    quickRow: { flexDirection: 'row', gap: Spacing.two },
     quickIcon: { fontSize: FontSize.lg, color: Colors.orange },
     journeysHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-    addBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.orange, alignItems: 'center', justifyContent: 'center' },
+    addBtn: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: Colors.orange,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
     addBtnText: { color: Colors.white, fontSize: FontSize.lg, fontWeight: FontWeight.bold },
-    emptyJourneys: { backgroundColor: Colors.white, borderRadius: Radius.lg, padding: Spacing.five, alignItems: 'center', ...Shadow.sm },
+    journeyItemCard: {
+        backgroundColor: Colors.white,
+        borderRadius: Radius.lg,
+        padding: Spacing.md,
+        ...Shadow.sm,
+    },
+    journeyItemTop: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 4,
+    },
+    journeyItemRoute: {
+        fontSize: FontSize.sm,
+        fontWeight: FontWeight.bold,
+        color: Colors.textDark,
+    },
+    journeyItemBadgeLive: {
+        color: '#0A9A5F',
+        fontSize: FontSize.xs,
+        fontWeight: FontWeight.bold,
+    },
+    journeyItemDesc: {
+        fontSize: FontSize.xs,
+        color: Colors.gray500,
+    },
+    emptyJourneys: {
+        backgroundColor: Colors.white,
+        borderRadius: Radius.lg,
+        padding: Spacing.five,
+        alignItems: 'center',
+        ...Shadow.sm,
+    },
     emptyText: { color: Colors.textDarkSecondary, fontSize: FontSize.sm, textAlign: 'center' },
 });

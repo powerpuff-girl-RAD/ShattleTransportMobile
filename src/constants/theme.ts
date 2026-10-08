@@ -55,6 +55,10 @@ export const Colors = {
   inputLightLabel: '#5A5E78',
   textDark: '#1A1A2E',   // headings on light surfaces
   textDarkSecondary: '#5A5E78',   // body / secondary on light surfaces
+  text: '#1A1A2E',
+  gray400: '#94A3B8',
+  gray500: '#64748B',
+  gray600: '#475569',
 
   // Status tints (light backgrounds behind success / error badges & icons)
   successTint: '#E6F8EF',
@@ -114,6 +118,12 @@ export const Fonts = Platform.select({
 
 // ─── Spacing (4-point base grid) ──────────────────────────────────────────
 export const Spacing = {
+  xs: 4,
+  sm: 8,
+  md: 16,
+  lg: 24,
+  xl: 32,
+  xxl: 40,
   one: 4,
   two: 8,
   three: 12,

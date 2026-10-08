@@ -48,7 +48,7 @@ export default function PassengerLayout() {
                     name="buy"
                     options={{
                         title: 'Buy',
-                        tabBarIcon: ({ color }) => <TabIcon glyph="＋" color={color} />,
+                        tabBarIcon: ({ color }) => <TabIcon glyph="🛒" color={color} />,
                     }}
                 />
                 <Tabs.Screen
@@ -76,6 +76,36 @@ export default function PassengerLayout() {
                 />
                 <Tabs.Screen
                     name="payment-success"
+                    options={{
+                        href: null,
+                        tabBarStyle: { display: 'none' },
+                    }}
+                />
+
+                {/* Hidden tab routes for Gate & Journey Flow */}
+                <Tabs.Screen
+                    name="gate-scanner"
+                    options={{
+                        href: null,
+                        tabBarStyle: { display: 'none' },
+                    }}
+                />
+                <Tabs.Screen
+                    name="boarding-confirmation"
+                    options={{
+                        href: null,
+                        tabBarStyle: { display: 'none' },
+                    }}
+                />
+                <Tabs.Screen
+                    name="validation-result"
+                    options={{
+                        href: null,
+                        tabBarStyle: { display: 'none' },
+                    }}
+                />
+                <Tabs.Screen
+                    name="alighting-confirmation"
                     options={{
                         href: null,
                         tabBarStyle: { display: 'none' },

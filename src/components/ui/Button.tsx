@@ -18,7 +18,8 @@ type Variant =
 
 interface ButtonProps extends Omit<PressableProps, 'style'> {
   variant?: Variant;
-  label: string;
+  label?: string;
+  title?: string;
   loading?: boolean;
   style?: ViewStyle;
 }
@@ -28,12 +29,14 @@ interface ButtonProps extends Omit<PressableProps, 'style'> {
 export function Button({
   variant = 'primary',
   label,
+  title,
   loading = false,
   style,
   disabled,
   ...rest
 }: ButtonProps) {
   const isDisabled = disabled || loading;
+  const buttonLabel = label ?? title ?? '';
 
   return (
     <Pressable
@@ -55,7 +58,7 @@ export function Button({
         />
       ) : (
         <Text variant="label" style={[styles.label, styles[`${variant}Label`]]}>
-          {label}
+          {buttonLabel}
         </Text>
       )}
     </Pressable>
