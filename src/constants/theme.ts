@@ -55,6 +55,15 @@ export const Colors = {
   inputLightLabel: '#5A5E78',
   textDark: '#1A1A2E',   // headings on light surfaces
   textDarkSecondary: '#5A5E78',   // body / secondary on light surfaces
+
+  // Status tints (light backgrounds behind success / error badges & icons)
+  successTint: '#E6F8EF',
+  errorTint: '#FDECEC',
+  orangeTint: '#FDF1E6',
+  divider: '#EDEFF3',
+
+  // Inspector app — dark bottom tab bar
+  inspectorTabBar: '#141E21',
 } as const;
 
 
