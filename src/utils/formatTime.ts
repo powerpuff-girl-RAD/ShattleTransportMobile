@@ -18,3 +18,23 @@ export function formatClock(iso: string): string {
 export function formatDate(iso: string): string {
     return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
+
+/** "Sep 19, 2025 · 3:15 PM" */
+export function formatDateTime(iso: string): string {
+    return `${formatDate(iso)} · ${formatClock(iso)}`;
+}
+
+/** Local calendar day as "YYYY-MM-DD" (the format the backend filters use). */
+export function toDateKey(date: Date): string {
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+/** "Today", "Yesterday" or "Mon 6" for a "YYYY-MM-DD" key. */
+export function dayLabel(dateKey: string): string {
+    const today = new Date();
+    if (dateKey === toDateKey(today)) return 'Today';
+    if (dateKey === toDateKey(new Date(today.getTime() - 86_400_000))) return 'Yesterday';
+    const d = new Date(`${dateKey}T00:00:00`);
+    return d.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric' });
+}

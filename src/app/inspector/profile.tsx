@@ -71,9 +71,10 @@ export default function InspectorProfileScreen() {
                 </View>
 
                 {/* ── Actions ───────────────────────────────────────────── */}
-                {/* Change Password / Shift Schedule screens — later step */}
-                <MenuItem icon="lock" label="Change Password" onPress={() => {}} />
-                <MenuItem icon="calendar" label="View Shift Schedule" onPress={() => {}} />
+                <MenuItem icon="chart" label="My Statistics" onPress={() => router.push('/inspector/stats')} />
+                <MenuItem icon="warning" label="Violation Records" onPress={() => router.push('/inspector/violations')} />
+                <MenuItem icon="calendar" label="View Shift Schedule" onPress={() => router.push('/inspector/schedule')} />
+                <MenuItem icon="lock" label="Change Password" onPress={() => router.push('/inspector/change-password')} />
                 <MenuItem icon="logout" label="Log Out" destructive onPress={() => setShowLogoutModal(true)} />
             </ScrollView>
 

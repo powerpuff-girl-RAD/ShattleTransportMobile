@@ -52,7 +52,7 @@ export default function InspectorDashboard() {
             <InspectorHeader
                 title={`Inspector ${profile?.name ?? ''}`}
                 subtitle={profile ? `Badge #${profile.badge}` : undefined}
-                action={{ icon: 'bell', label: 'Notifications', onPress: () => { /* Notifications — later step */ } }}
+                action={{ icon: 'chart', label: 'My statistics', onPress: () => router.push('/inspector/stats') }}
             />
 
             <ScrollView
@@ -129,7 +129,7 @@ export default function InspectorDashboard() {
                 {/* ── Recent inspections ────────────────────────────────── */}
                 <View style={styles.sectionHeader}>
                     <Text style={styles.sectionTitle}>Recent Inspections</Text>
-                    {recentInspections.length > 3 ? (
+                    {recentInspections.length > 0 ? (
                         <Pressable onPress={goToHistory} accessibilityRole="button">
                             <Text style={styles.seeAll}>See all</Text>
                         </Pressable>
@@ -143,8 +143,11 @@ export default function InspectorDashboard() {
                 ) : (
                     <View style={styles.list}>
                         {recent.map((inspection) => (
-                            // Inspection detail screen is added in step 5
-                            <InspectionRow key={inspection.id} inspection={inspection} />
+                            <InspectionRow
+                                key={inspection.id}
+                                inspection={inspection}
+                                onPress={() => router.push({ pathname: '/inspector/inspection/[id]', params: { id: String(inspection.id) } })}
+                            />
                         ))}
                     </View>
                 )}

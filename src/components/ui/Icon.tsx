@@ -27,6 +27,12 @@ const ICONS = {
     search: { ios: 'magnifyingglass', android: 'search' },
     location: { ios: 'mappin.and.ellipse', android: 'location_on' },
     report: { ios: 'doc.text', android: 'description' },
+    chart: { ios: 'chart.bar', android: 'bar_chart' },
+    bus: { ios: 'bus', android: 'directions_bus' },
+    clock: { ios: 'clock', android: 'schedule' },
+    card: { ios: 'creditcard', android: 'credit_card' },
+    eye: { ios: 'eye', android: 'visibility' },
+    eyeOff: { ios: 'eye.slash', android: 'visibility_off' },
 } as const satisfies Record<string, { ios: SFSymbol; android: AndroidSymbol }>;
 
 export type IconName = keyof typeof ICONS;

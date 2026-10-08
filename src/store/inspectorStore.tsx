@@ -7,14 +7,16 @@ import React, {
 } from 'react';
 
 import {
-    createInspection as apiCreateInspection,
     endShift as apiEndShift,
     getDashboard,
+    inspect as apiInspect,
     recordViolation as apiRecordViolation,
     startShift as apiStartShift,
 } from '@/api/inspectorApi';
 import type {
     Inspection,
+    InspectInput,
+    InspectionOutcome,
     InspectorProfile,
     InspectorShift,
     RecordViolationPayload,
@@ -23,13 +25,16 @@ import type {
 } from '@/api/inspectorApi';
 
 // ─── State ────────────────────────────────────────────────────────────────
+// Only state that several screens share lives here. Screens that just show a
+// list (History, Violations, Statistics, Schedule) fetch their own data.
 
 interface InspectorState {
     profile: InspectorProfile | null;
     shift: InspectorShift | null;
     todayStats: TodayStats;
     recentInspections: Inspection[];
-    violations: Violation[];
+    /** The most recent scan result — read by the Inspection Result screen. */
+    lastOutcome: InspectionOutcome | null;
     isLoading: boolean;
     error: string | null;
 }
@@ -39,7 +44,7 @@ const initialState: InspectorState = {
     shift: null,
     todayStats: { total: 0, valid: 0, violations: 0 },
     recentInspections: [],
-    violations: [],
+    lastOutcome: null,
     isLoading: false,
     error: null,
 };
@@ -51,8 +56,8 @@ type Action =
         payload: Pick<InspectorState, 'profile' | 'shift' | 'todayStats' | 'recentInspections'>;
     }
     | { type: 'SET_SHIFT'; payload: InspectorShift }
-    | { type: 'ADD_INSPECTION'; payload: Inspection }
-    | { type: 'ADD_VIOLATION'; payload: Violation }
+    | { type: 'ADD_INSPECTION'; payload: InspectionOutcome }
+    | { type: 'VIOLATION_RECORDED'; payload: Violation }
     | { type: 'SET_ERROR'; payload: string | null };
 
 // Reducer: the only place state changes. Each action returns a NEW state object.
@@ -65,11 +70,13 @@ function reducer(state: InspectorState, action: Action): InspectorState {
         case 'SET_SHIFT':
             return { ...state, shift: action.payload, error: null };
         case 'ADD_INSPECTION': {
-            const isValid = action.payload.result === 'Valid';
+            const { inspection } = action.payload;
+            const isValid = inspection.result === 'Valid';
             return {
                 ...state,
+                lastOutcome: action.payload,
                 // keep only the 3 newest for the Dashboard list
-                recentInspections: [action.payload, ...state.recentInspections].slice(0, 3),
+                recentInspections: [inspection, ...state.recentInspections].slice(0, 3),
                 todayStats: {
                     total: state.todayStats.total + 1,
                     valid: state.todayStats.valid + (isValid ? 1 : 0),
@@ -77,8 +84,18 @@ function reducer(state: InspectorState, action: Action): InspectorState {
                 },
             };
         }
-        case 'ADD_VIOLATION':
-            return { ...state, violations: [action.payload, ...state.violations] };
+        case 'VIOLATION_RECORDED': {
+            // Mark the inspection everywhere it is shown, so "Record Violation" disappears
+            const id = action.payload.inspectionId;
+            const mark = (i: Inspection) => (i.id === id ? { ...i, hasViolation: true } : i);
+            return {
+                ...state,
+                recentInspections: state.recentInspections.map(mark),
+                lastOutcome: state.lastOutcome
+                    ? { ...state.lastOutcome, inspection: mark(state.lastOutcome.inspection) }
+                    : null,
+            };
+        }
         case 'SET_ERROR':
             return { ...state, error: action.payload, isLoading: false };
         default:
@@ -87,7 +104,7 @@ function reducer(state: InspectorState, action: Action): InspectorState {
 }
 
 /** Reads the backend's { success:false, message } error body, if there is one. */
-function messageFrom(err: any, fallback: string): string {
+export function messageFrom(err: any, fallback: string): string {
     return err?.response?.data?.message || fallback;
 }
 
@@ -96,7 +113,7 @@ function messageFrom(err: any, fallback: string): string {
 interface InspectorContextValue extends InspectorState {
     loadDashboard: () => Promise<void>;
     toggleShift: () => Promise<void>;
-    addInspection: (inspection: Omit<Inspection, 'id' | 'inspectedAt'>) => Promise<Inspection>;
+    inspectToken: (input: InspectInput) => Promise<InspectionOutcome>;
     recordViolation: (payload: RecordViolationPayload) => Promise<Violation>;
 }
 
@@ -130,28 +147,26 @@ export function InspectorProvider({ children }: { children: React.ReactNode }) {
         }
     }, [state.shift]);
 
-    /** Saves the outcome of a scan so it appears in Recent Inspections. */
-    const addInspection = useCallback(async (inspection: Omit<Inspection, 'id' | 'inspectedAt'>) => {
-        const created = await apiCreateInspection(inspection);
-        dispatch({ type: 'ADD_INSPECTION', payload: created });
-        return created;
+    /**
+     * Sends a scanned QR / typed serial to the backend, which runs the checks
+     * and saves the inspection. Throws so the Scan screen can show the error.
+     */
+    const inspectToken = useCallback(async (input: InspectInput) => {
+        const outcome = await apiInspect(input);
+        dispatch({ type: 'ADD_INSPECTION', payload: outcome });
+        return outcome;
     }, []);
 
-    /** Records a violation — throws on failure so the form can show the error. */
+    /** Records a violation for an invalid inspection. Throws so the form can show the error. */
     const recordViolation = useCallback(async (payload: RecordViolationPayload) => {
-        try {
-            const violation = await apiRecordViolation(payload);
-            dispatch({ type: 'ADD_VIOLATION', payload: violation });
-            return violation;
-        } catch (err) {
-            dispatch({ type: 'SET_ERROR', payload: messageFrom(err, 'Failed to record violation') });
-            throw err;
-        }
+        const violation = await apiRecordViolation(payload);
+        dispatch({ type: 'VIOLATION_RECORDED', payload: violation });
+        return violation;
     }, []);
 
     const value = useMemo<InspectorContextValue>(
-        () => ({ ...state, loadDashboard, toggleShift, addInspection, recordViolation }),
-        [state, loadDashboard, toggleShift, addInspection, recordViolation]
+        () => ({ ...state, loadDashboard, toggleShift, inspectToken, recordViolation }),
+        [state, loadDashboard, toggleShift, inspectToken, recordViolation]
     );
 
     return (

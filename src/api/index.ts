@@ -144,24 +144,39 @@ export type {
     NotificationItem,
 } from "./journeyApi";
 
-// Inspector (dashboard, shift and QR validation are live; inspections/violations are temporary mocks)
+// Inspector (all live backend endpoints)
 export {
     getDashboard,
     startShift,
     endShift,
     validateQR,
-    createInspection,
+    inspect,
+    getInspections,
+    getInspection,
     recordViolation,
+    getViolations,
+    getStats,
+    getSchedule,
+    changePassword as changeInspectorPassword,
 } from "./inspectorApi";
 export type {
     Inspection,
+    InspectionCheck,
+    InspectionDetail,
+    InspectionList,
+    InspectionOutcome,
+    InspectionQuery,
     InspectionResult,
+    InspectInput,
     InspectionLocation,
     InspectorDashboard,
     InspectorProfile,
     InspectorShift,
+    InspectorStats,
     QRValidationResult,
     RecordViolationPayload,
+    ScheduledShift,
+    StatsPeriod,
     TodayStats,
     Violation,
     ViolationType,

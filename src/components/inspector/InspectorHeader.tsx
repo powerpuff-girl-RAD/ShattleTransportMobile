@@ -10,13 +10,15 @@ interface Props {
     subtitle?: string;
     /** Optional round icon button on the right (notifications, filters, export…). */
     action?: { icon: IconName; label: string; onPress: () => void };
+    /** Shows a back arrow instead of the shield tile (screens opened from another screen). */
+    onBack?: () => void;
 }
 
 /**
  * Gradient header used across the inspector screens:
- * shield tile + uppercase title + subtitle + optional action button.
+ * shield tile (or back arrow) + uppercase title + subtitle + optional action button.
  */
-export function InspectorHeader({ title, subtitle, action }: Props) {
+export function InspectorHeader({ title, subtitle, action, onBack }: Props) {
     const insets = useSafeAreaInsets();
 
     return (
@@ -28,9 +30,20 @@ export function InspectorHeader({ title, subtitle, action }: Props) {
             style={[styles.header, { paddingTop: insets.top + Spacing.four }]}
         >
             <View style={styles.left}>
-                <View style={styles.tile}>
-                    <Icon name="shield" color={Colors.white} size={24} />
-                </View>
+                {onBack ? (
+                    <Pressable
+                        style={({ pressed }) => [styles.tile, pressed && styles.actionPressed]}
+                        onPress={onBack}
+                        accessibilityRole="button"
+                        accessibilityLabel="Go back"
+                    >
+                        <Icon name="back" color={Colors.white} size={22} />
+                    </Pressable>
+                ) : (
+                    <View style={styles.tile}>
+                        <Icon name="shield" color={Colors.white} size={24} />
+                    </View>
+                )}
                 <View style={styles.titles}>
                     <Text style={styles.title} numberOfLines={1}>{title}</Text>
                     {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}

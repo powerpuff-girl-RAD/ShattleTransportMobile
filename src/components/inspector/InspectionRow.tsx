@@ -38,6 +38,11 @@ export function InspectionRow({ inspection, onPress }: Props) {
                 <Text style={styles.meta} numberOfLines={1}>
                     R-{inspection.routeNumber} {inspection.routeName} · {timeAgo(inspection.inspectedAt)}
                 </Text>
+                {inspection.reason ? (
+                    <Text style={styles.reason} numberOfLines={1}>
+                        {inspection.reason}{inspection.hasViolation ? ' · Violation recorded' : ''}
+                    </Text>
+                ) : null}
             </View>
 
             {onPress ? <Icon name="chevronRight" color={Colors.inputLightPlaceholder} size={18} /> : null}
@@ -63,4 +68,5 @@ const styles = StyleSheet.create({
     body: { flex: 1 },
     serial: { fontSize: FontSize.base, fontWeight: FontWeight.bold, color: Colors.textDark },
     meta: { fontSize: FontSize.xs, color: Colors.textDarkSecondary, marginTop: 2 },
+    reason: { fontSize: FontSize.xs, color: Colors.error, fontWeight: FontWeight.semibold, marginTop: 2 },
 });

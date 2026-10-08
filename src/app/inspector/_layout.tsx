@@ -14,6 +14,8 @@ export default function InspectorLayout() {
     return (
         <InspectorProvider>
             <Tabs
+                // Back button returns to the previous screen, not always to Home
+                backBehavior="history"
                 screenOptions={{
                     headerShown: false,
                     tabBarActiveTintColor: Colors.orange,
@@ -32,10 +34,21 @@ export default function InspectorLayout() {
                 <Tabs.Screen name="scan" options={{ title: 'Scan', tabBarIcon: tabIcon('scan') }} />
                 <Tabs.Screen name="history" options={{ title: 'History', tabBarIcon: tabIcon('history') }} />
                 <Tabs.Screen name="profile" options={{ title: 'Profile', tabBarIcon: tabIcon('person') }} />
+
+                {/* Screens opened from other screens — not shown as tabs */}
+                <Tabs.Screen name="result" options={HIDDEN} />
+                <Tabs.Screen name="violation" options={HIDDEN} />
+                <Tabs.Screen name="inspection/[id]" options={HIDDEN} />
+                <Tabs.Screen name="violations" options={HIDDEN} />
+                <Tabs.Screen name="stats" options={HIDDEN} />
+                <Tabs.Screen name="schedule" options={HIDDEN} />
+                <Tabs.Screen name="change-password" options={HIDDEN} />
             </Tabs>
         </InspectorProvider>
     );
 }
+
+const HIDDEN = { href: null } as const;
 
 function tabIcon(name: IconName) {
     return function TabIcon({ color }: { color: ColorValue }) {
