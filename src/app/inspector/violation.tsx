@@ -189,7 +189,7 @@ const styles = StyleSheet.create({
         width: 72, height: 72, borderRadius: 36, backgroundColor: Colors.successTint,
         alignItems: 'center', justifyContent: 'center',
     },
-    savedTitle: { color: Colors.textDark, fontSize: FontSize.lg, fontWeight: FontWeight.bold },
+    savedTitle: { color: Colors.textDark, fontSize: FontSize.lg, lineHeight: FontSize.lg * 1.3, fontWeight: FontWeight.bold },
     savedSub: { color: Colors.textDarkSecondary, fontSize: FontSize.sm, textAlign: 'center' },
     notesText: { color: Colors.textDark, fontSize: FontSize.sm, marginTop: Spacing.two, fontWeight: FontWeight.regular },
 });

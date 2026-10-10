@@ -29,7 +29,7 @@ const styles = StyleSheet.create({
         gap: 2,
         ...Shadow.sm,
     },
-    value: { fontSize: FontSize.xl, fontWeight: FontWeight.bold },
+    value: { fontSize: FontSize.xl, lineHeight: FontSize.xl * 1.3, fontWeight: FontWeight.bold },
     label: {
         fontSize: FontSize.xs - 1,
         fontWeight: FontWeight.semibold,

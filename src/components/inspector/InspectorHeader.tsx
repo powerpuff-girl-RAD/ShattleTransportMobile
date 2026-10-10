@@ -81,6 +81,7 @@ const styles = StyleSheet.create({
     titles: { flex: 1 },
     title: {
         fontSize: FontSize.lg,
+        lineHeight: FontSize.lg * 1.3,
         fontWeight: FontWeight.black,
         color: Colors.white,
         letterSpacing: LetterSpacing.normal,

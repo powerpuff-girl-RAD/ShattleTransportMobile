@@ -12,6 +12,9 @@ import { useScanFeedback } from '@/hooks/use-scan-feedback';
 import { useInspector } from '@/store/inspectorStore';
 import { formatClock, formatDateTime } from '@/utils/formatTime';
 
+/** The backend still sends every check it ran; flip this to show them on screen. */
+const SHOW_CHECKS = false;
+
 /**
  * Inspection Result — shown straight after a scan.
  * VALID / INVALID with the reason (visual), a beep + vibration (audio / haptic),
@@ -46,7 +49,8 @@ export default function ResultScreen() {
                     <Text style={styles.message}>{message}</Text>
                 </Card>
 
-                {/* ── Checks the backend ran (Pipe and Filter) ─────────── */}
+                {/* ── Checks the backend ran (Pipe and Filter) — hidden for now, set SHOW_CHECKS to true ── */}
+                {SHOW_CHECKS ? (
                 <Card title="Checks">
                     {checks.map((check) => (
                         <View key={check.name} style={styles.checkRow}>
@@ -59,6 +63,7 @@ export default function ResultScreen() {
                         </View>
                     ))}
                 </Card>
+                ) : null}
 
                 {/* ── Passenger and journey ────────────────────────────── */}
                 <Card title="Passenger">

@@ -39,9 +39,9 @@ const styles = StyleSheet.create({
     wrap: { alignItems: 'center', gap: Spacing.two },
     circle: { alignItems: 'center', justifyContent: 'center' },
     result: {
-        fontSize: FontSize['2xl'], fontWeight: FontWeight.black,
+        fontSize: FontSize['2xl'], lineHeight: FontSize['2xl'] * 1.3, fontWeight: FontWeight.black,
         textTransform: 'uppercase', letterSpacing: 2,
     },
-    resultSmall: { fontSize: FontSize.lg },
+    resultSmall: { fontSize: FontSize.lg, lineHeight: FontSize.lg * 1.3 },
     caption: { fontSize: FontSize.base, fontWeight: FontWeight.semibold, color: Colors.textDark, textAlign: 'center' },
 });

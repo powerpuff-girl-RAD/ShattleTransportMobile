@@ -126,6 +126,6 @@ const styles = StyleSheet.create({
         width: 72, height: 72, borderRadius: 36, backgroundColor: Colors.successTint,
         alignItems: 'center', justifyContent: 'center',
     },
-    doneTitle: { color: Colors.textDark, fontSize: FontSize.lg, fontWeight: FontWeight.bold },
+    doneTitle: { color: Colors.textDark, fontSize: FontSize.lg, lineHeight: FontSize.lg * 1.3, fontWeight: FontWeight.bold },
     doneButton: { alignSelf: 'stretch', marginTop: Spacing.two },
 });

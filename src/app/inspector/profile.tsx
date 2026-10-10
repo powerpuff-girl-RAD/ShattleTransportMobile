@@ -129,8 +129,8 @@ const styles = StyleSheet.create({
         width: AVATAR, height: AVATAR, borderRadius: AVATAR / 2,
         backgroundColor: Colors.gradientMid, alignItems: 'center', justifyContent: 'center',
     },
-    avatarText: { color: Colors.white, fontSize: FontSize['2xl'], fontWeight: FontWeight.bold },
-    name: { fontSize: FontSize.lg, fontWeight: FontWeight.bold, color: Colors.textDark },
+    avatarText: { color: Colors.white, fontSize: FontSize['2xl'], lineHeight: FontSize['2xl'] * 1.3, fontWeight: FontWeight.bold },
+    name: { fontSize: FontSize.lg, lineHeight: FontSize.lg * 1.3, fontWeight: FontWeight.bold, color: Colors.textDark },
     badge: {
         backgroundColor: Colors.gradientTop, borderRadius: Radius.full,
         paddingHorizontal: Spacing.three, paddingVertical: 3,
@@ -143,7 +143,7 @@ const styles = StyleSheet.create({
 
     statsRow: { flexDirection: 'row', alignItems: 'center' },
     stat: { flex: 1, alignItems: 'center', gap: 2 },
-    statValue: { fontSize: FontSize.lg, fontWeight: FontWeight.bold, color: Colors.textDark },
+    statValue: { fontSize: FontSize.lg, lineHeight: FontSize.lg * 1.3, fontWeight: FontWeight.bold, color: Colors.textDark },
     statLabel: {
         fontSize: FontSize.xs - 1, color: Colors.textDarkSecondary,
         textTransform: 'uppercase', letterSpacing: 0.5,

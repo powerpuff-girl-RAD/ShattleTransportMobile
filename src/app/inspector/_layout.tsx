@@ -3,6 +3,7 @@ import { Platform, type ColorValue } from 'react-native';
 
 import { Icon, type IconName } from '@/components/ui';
 import { Colors, FontSize, Layout } from '@/constants/theme';
+import { useSessionGuard } from '@/hooks/use-session-guard';
 import { InspectorProvider } from '@/store/inspectorStore';
 
 /**
@@ -11,6 +12,8 @@ import { InspectorProvider } from '@/store/inspectorStore';
  * violations) and shows the dark Home / Scan / History / Profile tab bar.
  */
 export default function InspectorLayout() {
+    useSessionGuard();
+
     return (
         <InspectorProvider>
             <Tabs

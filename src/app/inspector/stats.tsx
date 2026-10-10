@@ -176,7 +176,7 @@ const styles = StyleSheet.create({
     statsRow: { flexDirection: 'row', gap: Spacing.three },
 
     rateRow: { flexDirection: 'row', alignItems: 'baseline', gap: Spacing.two, marginBottom: Spacing.two },
-    rateValue: { color: Colors.primaryDark, fontSize: FontSize.xl, fontWeight: FontWeight.bold },
+    rateValue: { color: Colors.primaryDark, fontSize: FontSize.xl, lineHeight: FontSize.xl * 1.3, fontWeight: FontWeight.bold },
     rateHint: { color: Colors.textDarkSecondary, fontSize: FontSize.sm },
 
     barRow: { gap: Spacing.one, paddingVertical: Spacing.one },

@@ -273,7 +273,7 @@ const styles = StyleSheet.create({
         backgroundColor: Colors.white, borderTopLeftRadius: Radius['2xl'], borderTopRightRadius: Radius['2xl'],
         padding: Spacing.six, gap: Spacing.three,
     },
-    sheetTitle: { color: Colors.textDark, fontSize: FontSize.lg, fontWeight: FontWeight.bold },
+    sheetTitle: { color: Colors.textDark, fontSize: FontSize.lg, lineHeight: FontSize.lg * 1.3, fontWeight: FontWeight.bold },
     sheetSubtitle: { color: Colors.textDarkSecondary, fontSize: FontSize.sm },
     input: {
         height: 52, borderWidth: 1.5, borderColor: Colors.inputLightBorder, borderRadius: Radius.md,
@@ -289,7 +289,7 @@ const styles = StyleSheet.create({
         width: 72, height: 72, borderRadius: 36, backgroundColor: 'rgba(255,255,255,0.16)',
         alignItems: 'center', justifyContent: 'center', marginBottom: Spacing.two,
     },
-    messageTitle: { color: Colors.white, fontSize: FontSize.lg, fontWeight: FontWeight.bold },
+    messageTitle: { color: Colors.white, fontSize: FontSize.lg, lineHeight: FontSize.lg * 1.3, fontWeight: FontWeight.bold },
     messageText: { color: Colors.textSecondary, fontSize: FontSize.sm, textAlign: 'center' },
     messageButton: { alignSelf: 'stretch', marginTop: Spacing.four },
 });
