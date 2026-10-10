@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -22,11 +22,13 @@ export default function PassengerHome() {
         token,
         activeJourney,
         notifications,
+        bookings,
         isLoading,
         loadProfile,
         loadToken,
         loadActiveJourney,
         loadNotifications,
+        loadBookings,
     } = usePassenger();
 
     const [showLogoutModal, setShowLogoutModal] = useState(false);
@@ -37,12 +39,14 @@ export default function PassengerHome() {
         loadToken();
         loadActiveJourney();
         loadNotifications();
-    }, [loadProfile, loadToken, loadActiveJourney, loadNotifications]);
+        loadBookings();
+    }, [loadProfile, loadToken, loadActiveJourney, loadNotifications, loadBookings]);
 
     const goToTickets = useCallback(() => router.push('/passenger/tickets'), []);
     const goToBuy = useCallback(() => router.push('/passenger/buy'), []);
     const goToTopUp = useCallback(() => router.push('/passenger/topup'), []);
     const goToScanner = useCallback(() => router.push('/passenger/gate-scanner'), []);
+    const goToBooking = useCallback(() => router.push('/passenger/booking'), []);
 
     const handleConfirmLogout = useCallback(async () => {
         setIsLoggingOut(true);
@@ -70,6 +74,26 @@ export default function PassengerHome() {
     const displayName = profile?.fullName || user?.email || 'Passenger';
     const balance = profile?.account?.balance ?? null;
     const unreadCount = notifications.filter((n) => !n.isRead).length;
+
+    // Determine next scheduled booking (today or earliest future travel date)
+    const todayIso = new Date().toISOString().split('T')[0];
+    const activeBookings = (bookings || []).filter(
+        (b) => b.Status === 'Booked' || b.Status === 'InProgress'
+    );
+
+    // Sort by ScheduleDate asc, then TimeSlot asc
+    const sortedBookings = [...activeBookings].sort((a, b) => {
+        if (a.ScheduleDate !== b.ScheduleDate) {
+            return a.ScheduleDate.localeCompare(b.ScheduleDate);
+        }
+        return a.TimeSlot.localeCompare(b.TimeSlot);
+    });
+
+    // Prioritize today's booking or next upcoming booking
+    const nextBooking =
+        sortedBookings.find((b) => b.ScheduleDate >= todayIso) ||
+        sortedBookings[0] ||
+        (bookings && bookings.length > 0 ? bookings[0] : null);
 
     return (
         <View style={styles.root}>
@@ -132,15 +156,15 @@ export default function PassengerHome() {
                                 <Text style={styles.activeBadgeText}>IN PROGRESS</Text>
                             </View>
                             <Text style={styles.activeTime}>
-                                Boarded {new Date(activeJourney.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                Boarded {activeJourney.createdAt ? new Date(activeJourney.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Now'}
                             </Text>
                         </View>
 
                         <Text style={styles.activeRouteTitle}>
-                            Route {activeJourney.routeNumber} · {activeJourney.routeName}
+                            Route {(activeJourney as any)?.routeNumber || (activeJourney as any)?.RouteNumber || 'Bus'} · {(activeJourney as any)?.routeName || (activeJourney as any)?.RouteName || 'Transit'}
                         </Text>
                         <Text style={styles.activeStopText}>
-                            Boarded at: {activeJourney.boardingStop.stopName}
+                            Boarded at: {(activeJourney as any)?.boardingStop?.stopName || (activeJourney as any)?.boardingStop?.StopName || (activeJourney as any)?.BoardingStop?.StopName || (activeJourney as any)?.BoardingStop?.stopName || 'Transit Gate'}
                         </Text>
 
                         <Pressable style={styles.alightBtn} onPress={goToScanner}>
@@ -149,20 +173,33 @@ export default function PassengerHome() {
                     </View>
                 )}
 
-                {/* ── Active Token Card ────────────────────────────────── */}
+                {/* ── Active Token / Booking Ticket Card ────────────────── */}
                 {isLoading ? (
                     <ActivityIndicator color={Colors.orange} style={{ marginVertical: Spacing.six }} />
                 ) : (
-                    <TokenSummaryCard token={token} onPress={goToTickets} />
+                    <TokenSummaryCard
+                        token={token}
+                        booking={nextBooking}
+                        onPress={() => {
+                            if (nextBooking) {
+                                router.push({
+                                    pathname: '/passenger/booking-details',
+                                    params: { id: nextBooking.Id.toString() },
+                                });
+                            } else {
+                                goToTickets();
+                            }
+                        }}
+                    />
                 )}
 
                 {/* ── Quick Actions ────────────────────────────────────── */}
                 <Text style={styles.sectionTitle}>Quick actions</Text>
                 <View style={styles.quickRow}>
                     <QuickActionTile
-                        icon={<Text style={styles.quickIcon}>🚌</Text>}
-                        label={activeJourney ? 'Tap Out Gate' : 'Board Gate'}
-                        onPress={goToScanner}
+                        icon={<Text style={styles.quickIcon}>🎫</Text>}
+                        label="Book Bus"
+                        onPress={goToBooking}
                     />
                     <QuickActionTile
                         icon={<Text style={styles.quickIcon}>💳</Text>}
@@ -181,33 +218,85 @@ export default function PassengerHome() {
                     />
                 </View>
 
-                {/* ── Recent Journeys Section ───────────────────────────── */}
+                {/* ── Recent Journeys & Bookings Section ────────────────── */}
                 <View style={styles.journeysHeader}>
-                    <Text style={styles.sectionTitle}>Recent Journeys</Text>
+                    <Text style={styles.sectionTitle}>Recent Journeys & Bookings</Text>
                     <Pressable
                         style={styles.addBtn}
-                        onPress={goToScanner}
-                        accessibilityLabel="Scan to board"
+                        onPress={goToBooking}
+                        accessibilityLabel="Book a new journey"
                     >
                         <Text style={styles.addBtnText}>＋</Text>
                     </Pressable>
                 </View>
 
-                {activeJourney ? (
+                {/* Display Bookings if any exist */}
+                {bookings && bookings.length > 0 ? (
+                    <View style={styles.bookingsContainer}>
+                        {bookings.slice(0, 5).map((b) => {
+                            const isCompleted = b.Status === 'Completed';
+                            const isCancelled = b.Status === 'Cancelled';
+                            const isInProgress = b.Status === 'InProgress';
+                            const statusColor = isCompleted
+                                ? '#10B981'
+                                : isInProgress
+                                ? '#2563EB'
+                                : isCancelled
+                                ? '#EF4444'
+                                : '#E67E22';
+
+                            return (
+                                <Pressable
+                                    key={b.Id}
+                                    style={styles.bookingCard}
+                                    onPress={() => router.push({
+                                        pathname: '/passenger/booking-details',
+                                        params: { id: b.Id.toString() },
+                                    })}
+                                >
+                                    <View style={styles.bookingTop}>
+                                        <View style={styles.routeBadgeSmall}>
+                                            <Text style={styles.routeBadgeSmallText}>{b.RouteNumber}</Text>
+                                        </View>
+                                        <View style={styles.bookingMainWrap}>
+                                            <Text style={styles.bookingRouteName}>{b.RouteName}</Text>
+                                            <Text style={styles.bookingStopsText}>
+                                                {b.BoardingStop.StopName} → {b.AlightingStop.StopName}
+                                            </Text>
+                                        </View>
+                                        <View style={[styles.statusBadgeSmall, { backgroundColor: statusColor }]}>
+                                            <Text style={styles.statusBadgeSmallText}>{b.Status}</Text>
+                                        </View>
+                                    </View>
+
+                                    <View style={styles.bookingBottom}>
+                                        <Text style={styles.bookingDateTime}>
+                                            📅 {b.ScheduleDate} · ⏰ {b.TimeSlot}{b.MinorCount && b.MinorCount > 0 ? ` · 👥 ${b.AdultCount || 1}A+${b.MinorCount}M` : (b.PassengerCount && b.PassengerCount > 1 ? ` · 👥 ${b.PassengerCount}` : '')}
+                                        </Text>
+                                        <Text style={styles.bookingFare}>LKR {b.FareAmount.toFixed(2)}</Text>
+                                    </View>
+                                </Pressable>
+                            );
+                        })}
+                    </View>
+                ) : activeJourney ? (
                     <View style={styles.journeyItemCard}>
                         <View style={styles.journeyItemTop}>
-                            <Text style={styles.journeyItemRoute}>Route {activeJourney.routeNumber}</Text>
+                            <Text style={styles.journeyItemRoute}>Route {(activeJourney as any)?.routeNumber || (activeJourney as any)?.RouteNumber || 'Bus'}</Text>
                             <Text style={styles.journeyItemBadgeLive}>Live Trip</Text>
                         </View>
                         <Text style={styles.journeyItemDesc}>
-                            {activeJourney.boardingStop.stopName} → En Route
+                            {((activeJourney as any)?.boardingStop?.stopName || (activeJourney as any)?.boardingStop?.StopName || (activeJourney as any)?.BoardingStop?.StopName || (activeJourney as any)?.BoardingStop?.stopName || 'Transit Origin')} → En Route
                         </Text>
                     </View>
                 ) : (
                     <View style={styles.emptyJourneys}>
                         <Text style={styles.emptyText}>
-                            No active journey. Scan your token at any transit gate to start traveling.
+                            No booked journeys yet. Click '＋' to book your scheduled bus journey.
                         </Text>
+                        <Pressable style={styles.bookNowBtn} onPress={goToBooking}>
+                            <Text style={styles.bookNowBtnText}>Book a Journey Now →</Text>
+                        </Pressable>
                     </View>
                 )}
             </ScrollView>
@@ -349,6 +438,74 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     addBtnText: { color: Colors.white, fontSize: FontSize.lg, fontWeight: FontWeight.bold },
+    bookingsContainer: {
+        gap: Spacing.sm,
+    },
+    bookingCard: {
+        backgroundColor: Colors.white,
+        borderRadius: Radius.lg,
+        padding: Spacing.md,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        ...Shadow.sm,
+    },
+    bookingTop: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 6,
+    },
+    routeBadgeSmall: {
+        backgroundColor: '#E67E22',
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: Radius.sm,
+        marginRight: Spacing.sm,
+    },
+    routeBadgeSmallText: {
+        color: Colors.white,
+        fontSize: FontSize.xs,
+        fontWeight: FontWeight.bold,
+    },
+    bookingMainWrap: {
+        flex: 1,
+    },
+    bookingRouteName: {
+        fontSize: FontSize.xs,
+        fontWeight: FontWeight.bold,
+        color: Colors.textDark,
+    },
+    bookingStopsText: {
+        fontSize: 10,
+        color: Colors.gray500,
+        marginTop: 1,
+    },
+    statusBadgeSmall: {
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: Radius.sm,
+    },
+    statusBadgeSmallText: {
+        color: Colors.white,
+        fontSize: 9,
+        fontWeight: FontWeight.bold,
+    },
+    bookingBottom: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingTop: 6,
+        borderTopWidth: 1,
+        borderTopColor: '#F1F5F9',
+    },
+    bookingDateTime: {
+        fontSize: 10,
+        color: '#64748B',
+    },
+    bookingFare: {
+        fontSize: FontSize.xs,
+        fontWeight: FontWeight.bold,
+        color: '#0A9A5F',
+    },
     journeyItemCard: {
         backgroundColor: Colors.white,
         borderRadius: Radius.lg,
@@ -382,5 +539,16 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         ...Shadow.sm,
     },
-    emptyText: { color: Colors.textDarkSecondary, fontSize: FontSize.sm, textAlign: 'center' },
+    emptyText: { color: Colors.textDarkSecondary, fontSize: FontSize.sm, textAlign: 'center', marginBottom: Spacing.sm },
+    bookNowBtn: {
+        backgroundColor: '#0F6B56',
+        paddingHorizontal: Spacing.md,
+        paddingVertical: 8,
+        borderRadius: Radius.md,
+    },
+    bookNowBtnText: {
+        color: Colors.white,
+        fontSize: FontSize.xs,
+        fontWeight: FontWeight.bold,
+    },
 });
