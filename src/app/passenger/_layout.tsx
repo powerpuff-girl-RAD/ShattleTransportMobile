@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { Platform, Text } from 'react-native';
 import { Tabs } from 'expo-router';
 import { Colors, FontSize, Layout } from '@/constants/theme';
@@ -106,6 +106,29 @@ export default function PassengerLayout() {
                 />
                 <Tabs.Screen
                     name="alighting-confirmation"
+                    options={{
+                        href: null,
+                        tabBarStyle: { display: 'none' },
+                    }}
+                />
+
+                {/* Hidden tab routes for Journey Booking Flow */}
+                <Tabs.Screen
+                    name="booking"
+                    options={{
+                        href: null,
+                        tabBarStyle: { display: 'none' },
+                    }}
+                />
+                <Tabs.Screen
+                    name="booking-token"
+                    options={{
+                        href: null,
+                        tabBarStyle: { display: 'none' },
+                    }}
+                />
+                <Tabs.Screen
+                    name="booking-details"
                     options={{
                         href: null,
                         tabBarStyle: { display: 'none' },

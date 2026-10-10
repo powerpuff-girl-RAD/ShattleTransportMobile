@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -33,6 +33,8 @@ export default function GateScannerScreen() {
         token,
         profile,
         activeJourney,
+        bookings,
+        loadBookings,
         loadActiveJourney,
         boardJourney,
         alightJourney,
@@ -41,12 +43,14 @@ export default function GateScannerScreen() {
 
     const [selectedStopId, setSelectedStopId] = useState<number>(1);
     const [selectedAlightStopId, setSelectedAlightStopId] = useState<number>(5);
+    const [customTokenSerial, setCustomTokenSerial] = useState<string>('');
 
     useEffect(() => {
         loadActiveJourney();
-    }, [loadActiveJourney]);
+        loadBookings();
+    }, [loadActiveJourney, loadBookings]);
 
-    const activeTokenSerial = token?.serial || 'TK-88214';
+    const activeTokenSerial = customTokenSerial || token?.serial || 'TK-88214';
     const currentBalance = profile?.account?.balance ?? 180;
     const isJourneyActive = !!activeJourney;
 
@@ -248,6 +252,52 @@ export default function GateScannerScreen() {
                                     </Text>
                                 </Pressable>
                             ))}
+                        </View>
+                    </View>
+                )}
+
+                {/* ── Token Selector (General vs Booked Journeys) ──────── */}
+                {!isJourneyActive && bookings && bookings.filter(b => b.Status === 'Booked' || b.Status === 'InProgress').length > 0 && (
+                    <View style={styles.tripCard}>
+                        <Text style={styles.cardHeader}>SELECT TOKEN / BOOKING TO SCAN</Text>
+                        <View style={styles.stopPills}>
+                            <Pressable
+                                style={[
+                                    styles.stopPill,
+                                    !customTokenSerial ? styles.stopPillActive : undefined,
+                                ]}
+                                onPress={() => setCustomTokenSerial('')}
+                            >
+                                <Text
+                                    style={[
+                                        styles.stopPillText,
+                                        !customTokenSerial ? styles.stopPillTextActive : undefined,
+                                    ]}
+                                >
+                                    Default Wallet Token ({token?.serial || 'TK-88214'})
+                                </Text>
+                            </Pressable>
+                            {bookings
+                                .filter(b => b.Status === 'Booked' || b.Status === 'InProgress')
+                                .map((b) => (
+                                    <Pressable
+                                        key={b.Id || b.TokenSerial}
+                                        style={[
+                                            styles.stopPill,
+                                            customTokenSerial === b.TokenSerial ? styles.stopPillActive : undefined,
+                                        ]}
+                                        onPress={() => setCustomTokenSerial(b.TokenSerial)}
+                                    >
+                                        <Text
+                                            style={[
+                                                styles.stopPillText,
+                                                customTokenSerial === b.TokenSerial ? styles.stopPillTextActive : undefined,
+                                            ]}
+                                        >
+                                            Booked {b.RouteNumber}: {b.TokenSerial} ({b.TimeSlot})
+                                        </Text>
+                                    </Pressable>
+                                ))}
                         </View>
                     </View>
                 )}
