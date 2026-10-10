@@ -685,6 +685,14 @@ export default function BookingScreen() {
                             </Text>
                         </View>
 
+                        {/* Pay-at-Tapout Notice */}
+                        <View style={styles.payNoticeRow}>
+                            <Text style={styles.payNoticeIcon}>ℹ️</Text>
+                            <Text style={styles.payNoticeText}>
+                                Fare is not charged now. LKR {fareAmount !== null ? fareAmount.toFixed(2) : '--'} will be debited from your wallet upon tapping out at destination.
+                            </Text>
+                        </View>
+
                         {/* Warning if insufficient */}
                         {!isBalanceSufficient && fareAmount !== null && (
                             <View style={styles.insufficientBanner}>
@@ -711,7 +719,7 @@ export default function BookingScreen() {
                     <View style={styles.bookActionWrap}>
                         {isBalanceSufficient ? (
                             <Button
-                                label={`Book Journey · LKR ${fareAmount?.toFixed(2)}`}
+                                label={`Book Journey · Pay LKR ${fareAmount?.toFixed(2)} on Tap-Out`}
                                 onPress={handleBookJourney}
                                 loading={bookingsLoading}
                                 style={styles.bookBtn}
@@ -1344,6 +1352,27 @@ const styles = StyleSheet.create({
         color: Colors.white,
         fontSize: 10,
         fontWeight: FontWeight.bold,
+    },
+    payNoticeRow: {
+        flexDirection: 'row',
+        backgroundColor: '#F0FDF4',
+        borderRadius: Radius.md,
+        borderWidth: 1,
+        borderColor: '#BBF7D0',
+        padding: Spacing.sm,
+        marginTop: Spacing.xs,
+        alignItems: 'center',
+    },
+    payNoticeIcon: {
+        fontSize: 14,
+        marginRight: Spacing.xs,
+    },
+    payNoticeText: {
+        flex: 1,
+        fontSize: 11,
+        color: '#166534',
+        fontWeight: FontWeight.medium,
+        lineHeight: 16,
     },
     bookActionWrap: {
         marginBottom: Spacing.xl,

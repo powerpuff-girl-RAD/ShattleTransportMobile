@@ -57,7 +57,7 @@ export default function BookingDetailsScreen() {
             setShowCancelModal(false);
             Alert.alert(
                 'Booking Cancelled',
-                `Your booking #${booking.BookingRef} has been cancelled and LKR ${booking.FareAmount.toFixed(2)} has been refunded to your wallet balance.`,
+                `Your booking #${booking.BookingRef} has been cancelled. No wallet deduction occurred as fare is only collected upon alighting (tap-out).`,
                 [{ text: 'OK', onPress: () => fetchBooking() }]
             );
         } catch (err: any) {
@@ -207,7 +207,9 @@ export default function BookingDetailsScreen() {
                     </View>
 
                     <View style={styles.detailRow}>
-                        <Text style={styles.detailLabel}>Total Fare Paid</Text>
+                        <Text style={styles.detailLabel}>
+                            {booking.Status === 'Completed' ? 'Total Fare Paid' : 'Fare Due at Tap-Out'}
+                        </Text>
                         <Text style={styles.fareAmountText}>LKR {booking.FareAmount.toFixed(2)}</Text>
                     </View>
                 </View>

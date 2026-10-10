@@ -158,8 +158,10 @@ export default function BookingTokenScreen() {
                                 📅 {displayDate} · ⏰ {displayTimeSlot}
                             </Text>
                         </View>
-                        <View style={styles.paidBadge}>
-                            <Text style={styles.paidBadgeText}>PAID</Text>
+                        <View style={booking?.Status === 'Completed' ? styles.paidBadge : styles.dueBadge}>
+                            <Text style={booking?.Status === 'Completed' ? styles.paidBadgeText : styles.dueBadgeText}>
+                                {booking?.Status === 'Completed' ? 'PAID ON TAP-OUT' : 'DUE ON TAP-OUT'}
+                            </Text>
                         </View>
                     </View>
 
@@ -183,7 +185,9 @@ export default function BookingTokenScreen() {
                     </View>
 
                     <View style={styles.tripDetailRow}>
-                        <Text style={styles.tripDetailLabel}>Total Fare Paid</Text>
+                        <Text style={styles.tripDetailLabel}>
+                            {booking?.Status === 'Completed' ? 'Total Fare Paid' : 'Fare Due at Tap-Out'}
+                        </Text>
                         <Text style={styles.tripDetailFare}>LKR {displayFare.toFixed(2)}</Text>
                     </View>
 
@@ -302,7 +306,7 @@ export default function BookingTokenScreen() {
 
                         <Text style={styles.modalTitle}>Booking Confirmed!</Text>
                         <Text style={styles.modalSubtitle}>
-                            Your journey is reserved and your digital pass is activated.
+                            Your journey is reserved! Total fare of LKR {displayFare.toFixed(2)} will be debited from your wallet when you tap out at your destination.
                         </Text>
 
                         {/* Booking Summary Box */}
@@ -328,8 +332,8 @@ export default function BookingTokenScreen() {
                                 <Text style={styles.modalValue}>{passengerSummaryText}</Text>
                             </View>
                             <View style={styles.modalRow}>
-                                <Text style={styles.modalLabel}>Fare Paid</Text>
-                                <Text style={styles.modalValueBold}>LKR {displayFare.toFixed(2)}</Text>
+                                <Text style={styles.modalLabel}>Fare</Text>
+                                <Text style={styles.modalValueBold}>LKR {displayFare.toFixed(2)} (due at tap-out)</Text>
                             </View>
                             <View style={styles.modalRow}>
                                 <Text style={styles.modalLabel}>Pass Type</Text>
@@ -449,6 +453,19 @@ const styles = StyleSheet.create({
     },
     paidBadgeText: {
         color: '#0A9A5F',
+        fontSize: 10,
+        fontWeight: FontWeight.bold,
+    },
+    dueBadge: {
+        backgroundColor: '#E0F2FE',
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: Radius.sm,
+        borderWidth: 1,
+        borderColor: '#BAE6FD',
+    },
+    dueBadgeText: {
+        color: '#0369A1',
         fontSize: 10,
         fontWeight: FontWeight.bold,
     },
