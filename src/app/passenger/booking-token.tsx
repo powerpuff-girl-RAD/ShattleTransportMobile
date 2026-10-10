@@ -42,6 +42,10 @@ export default function BookingTokenScreen() {
         scheduleDate?: string;
         timeSlot?: string;
         fareAmount?: string;
+        passengerCount?: string;
+        passengerType?: string;
+        adultCount?: string;
+        minorCount?: string;
     }>();
 
     const bookingId = Number(params.bookingId);
@@ -94,6 +98,14 @@ export default function BookingTokenScreen() {
     const displayDate        = booking?.ScheduleDate || params.scheduleDate || '2026-10-10';
     const displayTimeSlot    = booking?.TimeSlot || params.timeSlot || '09:00 - 10:30';
     const displayFare        = booking?.FareAmount ?? parseFloat(params.fareAmount || '170');
+    const displayAdultCount  = booking?.AdultCount ?? parseInt(params.adultCount || '1', 10);
+    const displayMinorCount  = booking?.MinorCount ?? parseInt(params.minorCount || '0', 10);
+    const displayPassengerCount = booking?.PassengerCount ?? (displayAdultCount + displayMinorCount);
+    const displayPassengerType  = booking?.PassengerType ?? (displayMinorCount > 0 ? 'Mixed' : 'Adult');
+
+    const passengerSummaryText = displayMinorCount > 0
+        ? `${displayAdultCount} Adult${displayAdultCount > 1 ? 's' : ''}, ${displayMinorCount} Minor${displayMinorCount > 1 ? 's' : ''}`
+        : `${displayAdultCount} Adult${displayAdultCount > 1 ? 's' : ''} (Standard)`;
 
     // QR value encodes unique booking token payload
     const qrValue = booking?.QrPayload || JSON.stringify({
@@ -105,6 +117,10 @@ export default function BookingTokenScreen() {
         alighting: displayAlighting,
         date: displayDate,
         timeSlot: displayTimeSlot,
+        adultCount: displayAdultCount,
+        minorCount: displayMinorCount,
+        passengerCount: displayPassengerCount,
+        passengerType: displayPassengerType,
         fare: displayFare,
         passType: selectedPass,
     });
@@ -157,6 +173,13 @@ export default function BookingTokenScreen() {
                     <View style={styles.tripDetailRow}>
                         <Text style={styles.tripDetailLabel}>Alighting</Text>
                         <Text style={styles.tripDetailValueGreen}>{displayAlighting}</Text>
+                    </View>
+
+                    <View style={styles.tripDetailRow}>
+                        <Text style={styles.tripDetailLabel}>Passengers</Text>
+                        <Text style={styles.tripDetailValue}>
+                            {passengerSummaryText}
+                        </Text>
                     </View>
 
                     <View style={styles.tripDetailRow}>
@@ -299,6 +322,10 @@ export default function BookingTokenScreen() {
                             <View style={styles.modalRow}>
                                 <Text style={styles.modalLabel}>Departure</Text>
                                 <Text style={styles.modalValue}>{displayDate} · {displayTimeSlot}</Text>
+                            </View>
+                            <View style={styles.modalRow}>
+                                <Text style={styles.modalLabel}>Passengers</Text>
+                                <Text style={styles.modalValue}>{passengerSummaryText}</Text>
                             </View>
                             <View style={styles.modalRow}>
                                 <Text style={styles.modalLabel}>Fare Paid</Text>
@@ -444,6 +471,11 @@ const styles = StyleSheet.create({
         fontSize: FontSize.xs,
         fontWeight: FontWeight.bold,
         color: '#0F6B56',
+    },
+    tripDetailValue: {
+        fontSize: FontSize.xs,
+        fontWeight: FontWeight.bold,
+        color: '#334155',
     },
     tripDetailFare: {
         fontSize: FontSize.sm,

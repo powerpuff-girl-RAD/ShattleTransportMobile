@@ -1,4 +1,4 @@
-﻿import { apiClient } from './apiClient';
+import { apiClient } from './apiClient';
 
 export interface RouteStop {
     Id: number;
@@ -52,6 +52,14 @@ export interface BookingItem {
         DistanceFromStartKm: number;
     };
     DistanceKm: number;
+    AdultCount?: number;
+    MinorCount?: number;
+    PassengerCount?: number;
+    PassengerType?: 'Adult' | 'Minor' | 'Mixed';
+    AdultFareUnit?: number;
+    MinorFareUnit?: number;
+    BaseUnitFare?: number;
+    UnitFare?: number;
     FareAmount: number;
     IsPeak: boolean;
     PassType: 'QR' | 'Smartcard' | 'Barcode' | null;
@@ -71,6 +79,10 @@ export interface CreateBookingPayload {
     boardingStopId: number;
     alightingStopId: number;
     isPeak?: boolean;
+    adultCount?: number;
+    minorCount?: number;
+    passengerCount?: number;
+    passengerType?: 'Adult' | 'Minor' | 'Mixed';
 }
 
 export interface CreateBookingResult {
@@ -85,6 +97,10 @@ export interface CalculateBookingFarePayload {
     boardingStopId: number;
     alightingStopId: number;
     isPeak?: boolean;
+    adultCount?: number;
+    minorCount?: number;
+    passengerCount?: number;
+    passengerType?: 'Adult' | 'Minor' | 'Mixed';
 }
 
 export interface CalculateBookingFareResult {
@@ -94,6 +110,14 @@ export interface CalculateBookingFareResult {
     boardingStop: RouteStop;
     alightingStop: RouteStop;
     distanceKm: number;
+    adultCount?: number;
+    minorCount?: number;
+    adultFareUnit?: number;
+    minorFareUnit?: number;
+    baseUnitFare?: number;
+    unitFare?: number;
+    passengerCount?: number;
+    passengerType?: 'Adult' | 'Minor' | 'Mixed';
     fareAmount: number;
     isPeak: boolean;
 }

@@ -75,6 +75,26 @@ export default function PassengerHome() {
     const balance = profile?.account?.balance ?? null;
     const unreadCount = notifications.filter((n) => !n.isRead).length;
 
+    // Determine next scheduled booking (today or earliest future travel date)
+    const todayIso = new Date().toISOString().split('T')[0];
+    const activeBookings = (bookings || []).filter(
+        (b) => b.Status === 'Booked' || b.Status === 'InProgress'
+    );
+
+    // Sort by ScheduleDate asc, then TimeSlot asc
+    const sortedBookings = [...activeBookings].sort((a, b) => {
+        if (a.ScheduleDate !== b.ScheduleDate) {
+            return a.ScheduleDate.localeCompare(b.ScheduleDate);
+        }
+        return a.TimeSlot.localeCompare(b.TimeSlot);
+    });
+
+    // Prioritize today's booking or next upcoming booking
+    const nextBooking =
+        sortedBookings.find((b) => b.ScheduleDate >= todayIso) ||
+        sortedBookings[0] ||
+        (bookings && bookings.length > 0 ? bookings[0] : null);
+
     return (
         <View style={styles.root}>
             {/* ── Top Header ──────────────────────────────────────────── */}
@@ -136,15 +156,15 @@ export default function PassengerHome() {
                                 <Text style={styles.activeBadgeText}>IN PROGRESS</Text>
                             </View>
                             <Text style={styles.activeTime}>
-                                Boarded {new Date(activeJourney.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                Boarded {activeJourney.createdAt ? new Date(activeJourney.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Now'}
                             </Text>
                         </View>
 
                         <Text style={styles.activeRouteTitle}>
-                            Route {activeJourney.routeNumber} · {activeJourney.routeName}
+                            Route {(activeJourney as any)?.routeNumber || (activeJourney as any)?.RouteNumber || 'Bus'} · {(activeJourney as any)?.routeName || (activeJourney as any)?.RouteName || 'Transit'}
                         </Text>
                         <Text style={styles.activeStopText}>
-                            Boarded at: {activeJourney.boardingStop.stopName}
+                            Boarded at: {(activeJourney as any)?.boardingStop?.stopName || (activeJourney as any)?.boardingStop?.StopName || (activeJourney as any)?.BoardingStop?.StopName || (activeJourney as any)?.BoardingStop?.stopName || 'Transit Gate'}
                         </Text>
 
                         <Pressable style={styles.alightBtn} onPress={goToScanner}>
@@ -153,11 +173,24 @@ export default function PassengerHome() {
                     </View>
                 )}
 
-                {/* ── Active Token Card ────────────────────────────────── */}
+                {/* ── Active Token / Booking Ticket Card ────────────────── */}
                 {isLoading ? (
                     <ActivityIndicator color={Colors.orange} style={{ marginVertical: Spacing.six }} />
                 ) : (
-                    <TokenSummaryCard token={token} onPress={goToTickets} />
+                    <TokenSummaryCard
+                        token={token}
+                        booking={nextBooking}
+                        onPress={() => {
+                            if (nextBooking) {
+                                router.push({
+                                    pathname: '/passenger/booking-details',
+                                    params: { id: nextBooking.Id.toString() },
+                                });
+                            } else {
+                                goToTickets();
+                            }
+                        }}
+                    />
                 )}
 
                 {/* ── Quick Actions ────────────────────────────────────── */}
@@ -238,7 +271,7 @@ export default function PassengerHome() {
 
                                     <View style={styles.bookingBottom}>
                                         <Text style={styles.bookingDateTime}>
-                                            📅 {b.ScheduleDate} · ⏰ {b.TimeSlot}
+                                            📅 {b.ScheduleDate} · ⏰ {b.TimeSlot}{b.MinorCount && b.MinorCount > 0 ? ` · 👥 ${b.AdultCount || 1}A+${b.MinorCount}M` : (b.PassengerCount && b.PassengerCount > 1 ? ` · 👥 ${b.PassengerCount}` : '')}
                                         </Text>
                                         <Text style={styles.bookingFare}>LKR {b.FareAmount.toFixed(2)}</Text>
                                     </View>
@@ -249,11 +282,11 @@ export default function PassengerHome() {
                 ) : activeJourney ? (
                     <View style={styles.journeyItemCard}>
                         <View style={styles.journeyItemTop}>
-                            <Text style={styles.journeyItemRoute}>Route {activeJourney.routeNumber}</Text>
+                            <Text style={styles.journeyItemRoute}>Route {(activeJourney as any)?.routeNumber || (activeJourney as any)?.RouteNumber || 'Bus'}</Text>
                             <Text style={styles.journeyItemBadgeLive}>Live Trip</Text>
                         </View>
                         <Text style={styles.journeyItemDesc}>
-                            {activeJourney.boardingStop.stopName} → En Route
+                            {((activeJourney as any)?.boardingStop?.stopName || (activeJourney as any)?.boardingStop?.StopName || (activeJourney as any)?.BoardingStop?.StopName || (activeJourney as any)?.BoardingStop?.stopName || 'Transit Origin')} → En Route
                         </Text>
                     </View>
                 ) : (

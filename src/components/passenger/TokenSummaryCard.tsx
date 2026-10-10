@@ -2,27 +2,102 @@ import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Text } from '@/components/ui';
-import { Colors, FontSize, FontWeight, Gradient, Radius, Spacing } from '@/constants/theme';
+import { Colors, FontSize, FontWeight, Radius, Spacing } from '@/constants/theme';
 import type { DigitalToken } from '@/api/tokenApi';
+import type { BookingItem } from '@/api/bookingApi';
 
 interface Props {
     token: DigitalToken | null;
+    booking?: BookingItem | null;
     onPress: () => void;
 }
 
 /**
- * Home-screen card showing the active token summary.
+ * Home-screen card showing the active transit token or next scheduled journey booking.
  * Matches the orange→yellow gradient card from the Figma home design.
  */
-export function TokenSummaryCard({ token, onPress }: Props) {
+export function TokenSummaryCard({ token, booking, onPress }: Props) {
+    // If a scheduled booking exists for today or next departure, display it on top of home
+    if (booking) {
+        const isCompleted = booking.Status === 'Completed';
+        const isCancelled = booking.Status === 'Cancelled';
+        const isInProgress = booking.Status === 'InProgress';
+        const isToday = booking.ScheduleDate === new Date().toISOString().split('T')[0];
+
+        return (
+            <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel="View booking details and QR">
+                <LinearGradient
+                    colors={['#0F6B56', '#128C6E', '#17B890']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.card}
+                >
+                    {/* ── Top row ─────────────────────────────────── */}
+                    <View style={styles.topRow}>
+                        <View style={styles.routeBadge}>
+                            <Text style={[styles.routeBadgeText, { color: '#0F6B56' }]}>
+                                {isToday ? 'TODAY TRIP' : 'NEXT BOOKING'}
+                            </Text>
+                        </View>
+                        <View style={[styles.statusBadge, styles.statusActive]}>
+                            <View
+                                style={[
+                                    styles.statusDot,
+                                    { backgroundColor: isCancelled ? Colors.error : isCompleted ? Colors.gray500 : Colors.success },
+                                ]}
+                            />
+                            <Text style={styles.statusText}>{booking.Status.toUpperCase()}</Text>
+                        </View>
+                    </View>
+
+                    {/* ── Route info & token serial ───────────────── */}
+                    <Text style={styles.tokenSerial}>Route {booking.RouteNumber} · #{booking.TokenSerial}</Text>
+                    <Text style={styles.bookingStopsRow}>
+                        {booking.BoardingStop.StopName} → {booking.AlightingStop.StopName}
+                    </Text>
+
+                    {/* ── Dashed divider ───────────────────────────── */}
+                    <View style={styles.divider} />
+
+                    {/* ── Footer info ──────────────────────────────── */}
+                    <View style={styles.footer}>
+                        <View style={styles.footerItem}>
+                            <Text style={styles.footerLabel}>DATE</Text>
+                            <Text style={styles.footerValue}>{booking.ScheduleDate}</Text>
+                        </View>
+                        <View style={styles.footerItem}>
+                            <Text style={styles.footerLabel}>TIME SLOT</Text>
+                            <Text style={styles.footerValue}>{booking.TimeSlot}</Text>
+                        </View>
+                        <View style={styles.footerItem}>
+                            <Text style={styles.footerLabel}>PASSENGERS</Text>
+                            <Text style={styles.footerValue}>
+                                {booking.MinorCount && booking.MinorCount > 0
+                                    ? `${booking.AdultCount || 1}A + ${booking.MinorCount}M`
+                                    : `${booking.PassengerCount || 1} ${booking.PassengerType || 'Adult'}`}
+                            </Text>
+                        </View>
+                        <View style={styles.footerItem}>
+                            <Text style={styles.footerLabel}>FARE</Text>
+                            <Text style={styles.footerValue}>LKR {booking.FareAmount.toFixed(0)}</Text>
+                        </View>
+                    </View>
+
+                    {/* ── CTA ──────────────────────────────────────── */}
+                    <Text style={styles.cta}>Show Journey QR Code →</Text>
+                </LinearGradient>
+            </Pressable>
+        );
+    }
+
     if (!token) {
         return (
             <Pressable style={styles.emptyCard} onPress={onPress}>
                 <Text variant="body" style={styles.emptyText}>
-                    No active token.{' '}
+                    No active booking or token.{' '}
                 </Text>
                 <Text variant="body" style={styles.emptyLink}>
-                    Tap to activate one →
+                    Tap to book a journey →
                 </Text>
             </Pressable>
         );
@@ -150,6 +225,12 @@ const styles = StyleSheet.create({
     tokenType: {
         fontSize: FontSize.sm,
         color: 'rgba(255,255,255,0.8)',
+    },
+    bookingStopsRow: {
+        fontSize: FontSize.sm,
+        color: 'rgba(255,255,255,0.95)',
+        fontWeight: FontWeight.medium,
+        marginTop: 2,
     },
     divider: {
         borderTopWidth: 1,

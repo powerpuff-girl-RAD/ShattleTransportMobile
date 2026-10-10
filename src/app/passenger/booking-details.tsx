@@ -96,6 +96,10 @@ export default function BookingDetailsScreen() {
         ? '#EF4444'
         : '#E67E22';
 
+    const passengerSummaryText = (booking.MinorCount && booking.MinorCount > 0)
+        ? `${booking.AdultCount || 1} Adult${(booking.AdultCount || 1) > 1 ? 's' : ''}, ${booking.MinorCount} Minor${booking.MinorCount > 1 ? 's' : ''}`
+        : `${booking.AdultCount || booking.PassengerCount || 1} Adult${(booking.AdultCount || booking.PassengerCount || 1) > 1 ? 's' : ''} (Standard)`;
+
     const qrValue = booking.QrPayload || JSON.stringify({
         bookingId: booking.Id,
         bookingRef: booking.BookingRef,
@@ -105,6 +109,10 @@ export default function BookingDetailsScreen() {
         alighting: booking.AlightingStop.StopName,
         date: booking.ScheduleDate,
         timeSlot: booking.TimeSlot,
+        adultCount: booking.AdultCount ?? 1,
+        minorCount: booking.MinorCount ?? 0,
+        passengerCount: booking.PassengerCount || 1,
+        passengerType: booking.PassengerType || 'Adult',
         fare: booking.FareAmount,
     });
 
@@ -184,6 +192,13 @@ export default function BookingDetailsScreen() {
                     <View style={styles.detailRow}>
                         <Text style={styles.detailLabel}>Alighting Stop</Text>
                         <Text style={styles.detailValueGreen}>{booking.AlightingStop.StopName}</Text>
+                    </View>
+
+                    <View style={styles.detailRow}>
+                        <Text style={styles.detailLabel}>Passengers</Text>
+                        <Text style={styles.detailValue}>
+                            {passengerSummaryText}
+                        </Text>
                     </View>
 
                     <View style={styles.detailRow}>

@@ -77,8 +77,15 @@ export default function BookingScreen() {
     const [selectedBoardingStop, setSelectedBoardingStop] = useState<RouteStop | null>(null);
     const [selectedAlightingStop, setSelectedAlightingStop] = useState<RouteStop | null>(null);
 
+    // Passenger details (Adult & Minor Counts)
+    const [adultCount, setAdultCount] = useState<number>(1);
+    const [minorCount, setMinorCount] = useState<number>(0);
+    const [showMinorSection, setShowMinorSection] = useState<boolean>(false);
+
     // Fare calculation
     const [fareAmount, setFareAmount] = useState<number | null>(null);
+    const [adultFareUnit, setAdultFareUnit] = useState<number | null>(null);
+    const [minorFareUnit, setMinorFareUnit] = useState<number | null>(null);
     const [distanceKm, setDistanceKm] = useState<number | null>(null);
     const [isCalculatingFare, setIsCalculatingFare] = useState(false);
 
@@ -137,20 +144,26 @@ export default function BookingScreen() {
         }
     };
 
-    // ── Calculate fare when stops or route change ─────────────────────────────
+    // ── Calculate fare when stops, route, adultCount or minorCount change ─────
     useEffect(() => {
         let isMounted = true;
         if (!selectedRoute || !selectedBoardingStop || !selectedAlightingStop) {
             setFareAmount(null);
+            setAdultFareUnit(null);
+            setMinorFareUnit(null);
             setDistanceKm(null);
             return;
         }
 
         if (selectedBoardingStop.Id === selectedAlightingStop.Id) {
             setFareAmount(null);
+            setAdultFareUnit(null);
+            setMinorFareUnit(null);
             setDistanceKm(null);
             return;
         }
+
+        const effectiveMinorCount = showMinorSection ? minorCount : 0;
 
         const calculate = async () => {
             setIsCalculatingFare(true);
@@ -160,9 +173,13 @@ export default function BookingScreen() {
                     boardingStopId: selectedBoardingStop.Id,
                     alightingStopId: selectedAlightingStop.Id,
                     isPeak: true,
+                    adultCount,
+                    minorCount: effectiveMinorCount,
                 });
                 if (isMounted) {
                     setFareAmount(res.fareAmount);
+                    setAdultFareUnit(res.adultFareUnit ?? null);
+                    setMinorFareUnit(res.minorFareUnit ?? null);
                     setDistanceKm(res.distanceKm);
                 }
             } catch {
@@ -170,8 +187,13 @@ export default function BookingScreen() {
                     const bKm = Number(selectedBoardingStop.DistanceFromStartKm || 0);
                     const aKm = Number(selectedAlightingStop.DistanceFromStartKm || 0);
                     const dist = Math.max(1, Math.abs(aKm - bKm));
+                    const base = dist >= 30 ? 170 : dist >= 10 ? 90 : 50;
+                    const aFare = base;
+                    const mFare = Math.round(base * 0.5 * 100) / 100;
                     setDistanceKm(dist);
-                    setFareAmount(dist >= 30 ? 170 : dist >= 10 ? 90 : 50);
+                    setAdultFareUnit(aFare);
+                    setMinorFareUnit(mFare);
+                    setFareAmount((adultCount * aFare) + (effectiveMinorCount * mFare));
                 }
             } finally {
                 if (isMounted) setIsCalculatingFare(false);
@@ -182,7 +204,7 @@ export default function BookingScreen() {
         return () => {
             isMounted = false;
         };
-    }, [selectedRoute, selectedBoardingStop, selectedAlightingStop]);
+    }, [selectedRoute, selectedBoardingStop, selectedAlightingStop, adultCount, minorCount, showMinorSection]);
 
     // ── Confirm & Book ────────────────────────────────────────────────────────
     const handleBookJourney = async () => {
@@ -208,6 +230,11 @@ export default function BookingScreen() {
             return;
         }
 
+        const effectiveMinorCount = showMinorSection ? minorCount : 0;
+        const totalPassengers = adultCount + effectiveMinorCount;
+        const passengerTypeLabel: 'Adult' | 'Minor' | 'Mixed' =
+            effectiveMinorCount > 0 ? (adultCount > 0 ? 'Mixed' : 'Minor') : 'Adult';
+
         clearError();
         try {
             const res = await createJourneyBooking({
@@ -216,6 +243,10 @@ export default function BookingScreen() {
                 boardingStopId: selectedBoardingStop.Id,
                 alightingStopId: selectedAlightingStop.Id,
                 isPeak: true,
+                adultCount,
+                minorCount: effectiveMinorCount,
+                passengerCount: totalPassengers,
+                passengerType: passengerTypeLabel,
             });
 
             router.push({
@@ -231,6 +262,10 @@ export default function BookingScreen() {
                     scheduleDate: res.booking.ScheduleDate,
                     timeSlot: res.booking.TimeSlot,
                     fareAmount: res.booking.FareAmount.toString(),
+                    passengerCount: (res.booking.PassengerCount || totalPassengers).toString(),
+                    passengerType: res.booking.PassengerType || passengerTypeLabel,
+                    adultCount: (res.booking.AdultCount ?? adultCount).toString(),
+                    minorCount: (res.booking.MinorCount ?? effectiveMinorCount).toString(),
                 },
             });
         } catch (err: any) {
@@ -458,6 +493,127 @@ export default function BookingScreen() {
                                 );
                             })}
                         </View>
+
+                        <View style={styles.stepDivider} />
+
+                        {/* ── Passenger Details (Separately Adult & Minor) ──────────────── */}
+                        <Text style={styles.stepHeader}>PASSENGER DETAILS</Text>
+
+                        {/* Adult Passengers Counter (Default always displayed) */}
+                        <View style={styles.passengerRowCard}>
+                            <View style={styles.passengerInfoCol}>
+                                <View style={styles.passengerTitleRow}>
+                                    <Text style={styles.countTitle}>🧑 Adults</Text>
+                                    <View style={styles.adultBadge}>
+                                        <Text style={styles.adultBadgeText}>STANDARD</Text>
+                                    </View>
+                                </View>
+                                <Text style={styles.countSubtitle}>
+                                    Full fare {adultFareUnit ? `(LKR ${adultFareUnit.toFixed(2)}/seat)` : ''}
+                                </Text>
+                            </View>
+                            <View style={styles.stepperWrap}>
+                                <Pressable
+                                    style={[
+                                        styles.stepperBtn,
+                                        adultCount <= 1 ? styles.stepperBtnDisabled : undefined,
+                                    ]}
+                                    disabled={adultCount <= 1}
+                                    onPress={() => setAdultCount((c) => Math.max(1, c - 1))}
+                                >
+                                    <Text style={styles.stepperBtnText}>−</Text>
+                                </Pressable>
+                                <View style={styles.stepperValueBox}>
+                                    <Text style={styles.stepperValueText}>{adultCount}</Text>
+                                </View>
+                                <Pressable
+                                    style={[
+                                        styles.stepperBtn,
+                                        adultCount >= 10 ? styles.stepperBtnDisabled : undefined,
+                                    ]}
+                                    disabled={adultCount >= 10}
+                                    onPress={() => setAdultCount((c) => Math.min(10, c + 1))}
+                                >
+                                    <Text style={styles.stepperBtnText}>+</Text>
+                                </Pressable>
+                            </View>
+                        </View>
+
+                        {/* Minor Passenger Section: Hidden by default, displayed if user adds minors */}
+                        {!showMinorSection ? (
+                            <Pressable
+                                style={styles.addMinorButton}
+                                onPress={() => {
+                                    setShowMinorSection(true);
+                                    setMinorCount(1);
+                                }}
+                            >
+                                <View style={styles.addMinorIconWrap}>
+                                    <Text style={styles.addMinorPlusIcon}>＋</Text>
+                                </View>
+                                <View style={styles.addMinorTextCol}>
+                                    <Text style={styles.addMinorTitle}>Add Minor Passengers</Text>
+                                    <Text style={styles.addMinorDesc}>Children under 12 · 50% concession discount</Text>
+                                </View>
+                                <View style={styles.concessionTag}>
+                                    <Text style={styles.concessionTagText}>50% OFF</Text>
+                                </View>
+                            </Pressable>
+                        ) : (
+                            <View style={styles.minorPassengerCard}>
+                                <View style={styles.minorCardTopRow}>
+                                    <View style={styles.passengerInfoCol}>
+                                        <View style={styles.passengerTitleRow}>
+                                            <Text style={styles.countTitle}>🧒 Minors</Text>
+                                            <View style={styles.concessionTag}>
+                                                <Text style={styles.concessionTagText}>50% OFF</Text>
+                                            </View>
+                                        </View>
+                                        <Text style={styles.countSubtitle}>
+                                            Children under 12 {minorFareUnit ? `(LKR ${minorFareUnit.toFixed(2)}/seat)` : ''}
+                                        </Text>
+                                    </View>
+                                    <Pressable
+                                        style={styles.removeMinorBtn}
+                                        onPress={() => {
+                                            setShowMinorSection(false);
+                                            setMinorCount(0);
+                                        }}
+                                    >
+                                        <Text style={styles.removeMinorText}>✕ Remove</Text>
+                                    </Pressable>
+                                </View>
+
+                                <View style={styles.minorStepperRow}>
+                                    <Text style={styles.minorSeatsLabel}>Minor Seats:</Text>
+                                    <View style={styles.stepperWrap}>
+                                        <Pressable
+                                            style={[
+                                                styles.stepperBtn,
+                                                minorCount <= 1 ? styles.stepperBtnDisabled : undefined,
+                                            ]}
+                                            disabled={minorCount <= 1}
+                                            onPress={() => setMinorCount((c) => Math.max(1, c - 1))}
+                                        >
+                                            <Text style={styles.stepperBtnText}>−</Text>
+                                        </Pressable>
+                                        <View style={styles.stepperValueBox}>
+                                            <Text style={styles.stepperValueText}>{minorCount}</Text>
+                                        </View>
+                                        <Pressable
+                                            style={[
+                                                styles.stepperBtn,
+                                                minorCount >= 10 ? styles.stepperBtnDisabled : undefined,
+                                            ]}
+                                            disabled={minorCount >= 10}
+                                            onPress={() => setMinorCount((c) => Math.min(10, c + 1))}
+                                        >
+                                            <Text style={styles.stepperBtnText}>+</Text>
+                                        </Pressable>
+                                    </View>
+                                </View>
+                            </View>
+                        )}
                     </View>
                 )}
 
@@ -482,6 +638,25 @@ export default function BookingScreen() {
                             <Text style={styles.summaryLabel}>To</Text>
                             <Text style={styles.summaryValueGreen}>{selectedAlightingStop.StopName}</Text>
                         </View>
+
+                        <View style={styles.summaryRow}>
+                            <Text style={styles.summaryLabel}>Passengers</Text>
+                            <Text style={styles.summaryValue}>
+                                {adultCount} Adult{adultCount > 1 ? 's' : ''}
+                                {showMinorSection && minorCount > 0 ? ` + ${minorCount} Minor${minorCount > 1 ? 's' : ''}` : ''}
+                            </Text>
+                        </View>
+
+                        {showMinorSection && minorCount > 0 && adultFareUnit && minorFareUnit && (
+                            <View style={styles.fareBreakdownRow}>
+                                <Text style={styles.breakdownText}>
+                                    • Adults: {adultCount} × LKR {adultFareUnit.toFixed(2)} = LKR {(adultCount * adultFareUnit).toFixed(2)}
+                                </Text>
+                                <Text style={styles.breakdownText}>
+                                    • Minors (50%): {minorCount} × LKR {minorFareUnit.toFixed(2)} = LKR {(minorCount * minorFareUnit).toFixed(2)}
+                                </Text>
+                            </View>
+                        )}
 
                         <View style={styles.summaryRow}>
                             <Text style={styles.summaryLabel}>Est. Distance</Text>
@@ -894,6 +1069,193 @@ const styles = StyleSheet.create({
         padding: Spacing.md,
         marginBottom: Spacing.md,
         ...Shadow.sm,
+    },
+    passengerRowCard: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        backgroundColor: '#F8FAFC',
+        borderRadius: Radius.lg,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        padding: Spacing.sm,
+        marginBottom: Spacing.sm,
+    },
+    passengerInfoCol: {
+        flex: 1,
+        marginRight: Spacing.sm,
+    },
+    passengerTitleRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    adultBadge: {
+        backgroundColor: '#E2E8F0',
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 4,
+    },
+    adultBadgeText: {
+        fontSize: 9,
+        fontWeight: FontWeight.bold,
+        color: '#475569',
+    },
+    addMinorButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F8FAFC',
+        borderWidth: 1.5,
+        borderColor: '#CBD5E1',
+        borderStyle: 'dashed',
+        borderRadius: Radius.lg,
+        padding: Spacing.sm,
+        marginBottom: Spacing.sm,
+    },
+    addMinorIconWrap: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: '#E6FAF2',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: Spacing.sm,
+    },
+    addMinorPlusIcon: {
+        color: '#0F6B56',
+        fontSize: FontSize.md,
+        fontWeight: FontWeight.bold,
+    },
+    addMinorTextCol: {
+        flex: 1,
+    },
+    addMinorTitle: {
+        fontSize: FontSize.xs,
+        fontWeight: FontWeight.bold,
+        color: '#0F6B56',
+    },
+    addMinorDesc: {
+        fontSize: 10,
+        color: '#64748B',
+        marginTop: 2,
+    },
+    concessionTag: {
+        backgroundColor: '#FEF3C7',
+        borderWidth: 1,
+        borderColor: '#FDE68A',
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 4,
+    },
+    concessionTagText: {
+        fontSize: 9,
+        fontWeight: FontWeight.bold,
+        color: '#B45309',
+    },
+    minorPassengerCard: {
+        backgroundColor: '#FFFDF9',
+        borderRadius: Radius.lg,
+        borderWidth: 1.5,
+        borderColor: '#FED7AA',
+        padding: Spacing.sm,
+        marginBottom: Spacing.sm,
+    },
+    minorCardTopRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 6,
+    },
+    removeMinorBtn: {
+        backgroundColor: '#FEE2E2',
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 4,
+    },
+    removeMinorText: {
+        fontSize: 10,
+        fontWeight: FontWeight.bold,
+        color: '#B91C1C',
+    },
+    minorStepperRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingTop: 4,
+        borderTopWidth: 1,
+        borderTopColor: '#FFEDD5',
+    },
+    minorSeatsLabel: {
+        fontSize: FontSize.xs,
+        fontWeight: FontWeight.semibold,
+        color: '#9A3412',
+    },
+    fareBreakdownRow: {
+        backgroundColor: '#F8FAFC',
+        padding: 8,
+        borderRadius: Radius.sm,
+        marginVertical: 4,
+        gap: 3,
+    },
+    breakdownText: {
+        fontSize: 11,
+        color: '#475569',
+        fontWeight: FontWeight.medium,
+    },
+    countRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        backgroundColor: '#F8FAFC',
+        borderRadius: Radius.lg,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        padding: Spacing.sm,
+        marginBottom: Spacing.sm,
+    },
+    countTitle: {
+        fontSize: FontSize.sm,
+        fontWeight: FontWeight.bold,
+        color: Colors.text,
+    },
+    countSubtitle: {
+        fontSize: FontSize.xs,
+        color: Colors.gray500,
+        marginTop: 2,
+    },
+    stepperWrap: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: Colors.white,
+        borderRadius: Radius.md,
+        borderWidth: 1,
+        borderColor: '#CBD5E1',
+        overflow: 'hidden',
+    },
+    stepperBtn: {
+        width: 36,
+        height: 36,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#F1F5F9',
+    },
+    stepperBtnDisabled: {
+        opacity: 0.4,
+    },
+    stepperBtnText: {
+        fontSize: FontSize.lg,
+        fontWeight: FontWeight.bold,
+        color: '#334155',
+    },
+    stepperValueBox: {
+        width: 40,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    stepperValueText: {
+        fontSize: FontSize.md,
+        fontWeight: FontWeight.bold,
+        color: Colors.text,
     },
     summaryTitle: {
         fontSize: FontSize.xs,
