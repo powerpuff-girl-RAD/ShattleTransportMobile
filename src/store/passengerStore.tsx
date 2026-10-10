@@ -24,6 +24,12 @@ import {
     alightJourney as apiAlightJourney,
     getNotifications as apiGetNotifications,
 } from '@/api/journeyApi';
+import {
+    getUserBookings as apiGetUserBookings,
+    createBooking as apiCreateBooking,
+    activateBookingToken as apiActivateBookingToken,
+    cancelBooking as apiCancelBooking,
+} from '@/api/bookingApi';
 import type {
     PassengerProfileData,
     UpdateProfilePayload,
@@ -43,6 +49,11 @@ import type {
     AlightingResult,
     NotificationItem,
 } from '@/api/journeyApi';
+import type {
+    BookingItem,
+    CreateBookingPayload,
+    CreateBookingResult,
+} from '@/api/bookingApi';
 
 // ─── State ────────────────────────────────────────────────────────────────
 
@@ -52,9 +63,11 @@ interface PassengerState {
     qr: QRGenerationResult | null;
     activeJourney: Journey | null;
     notifications: NotificationItem[];
+    bookings: BookingItem[];
     isLoading: boolean;
     tokenLoading: boolean;
     journeyLoading: boolean;
+    bookingsLoading: boolean;
     error: string | null;
 }
 
@@ -64,9 +77,11 @@ const initialState: PassengerState = {
     qr: null,
     activeJourney: null,
     notifications: [],
+    bookings: [],
     isLoading: false,
     tokenLoading: false,
     journeyLoading: false,
+    bookingsLoading: false,
     error: null,
 };
 
@@ -74,12 +89,15 @@ type Action =
     | { type: 'SET_LOADING'; payload: boolean }
     | { type: 'SET_TOKEN_LOADING'; payload: boolean }
     | { type: 'SET_JOURNEY_LOADING'; payload: boolean }
+    | { type: 'SET_BOOKINGS_LOADING'; payload: boolean }
     | { type: 'SET_PROFILE'; payload: PassengerProfileData }
     | { type: 'SET_BALANCE'; payload: number }
     | { type: 'SET_TOKEN'; payload: DigitalToken | null }
     | { type: 'SET_QR'; payload: QRGenerationResult | null }
     | { type: 'SET_ACTIVE_JOURNEY'; payload: Journey | null }
     | { type: 'SET_NOTIFICATIONS'; payload: NotificationItem[] }
+    | { type: 'SET_BOOKINGS'; payload: BookingItem[] }
+    | { type: 'UPSERT_BOOKING'; payload: BookingItem }
     | { type: 'SET_ERROR'; payload: string | null }
     | { type: 'CLEAR' };
 
@@ -88,6 +106,7 @@ function reducer(state: PassengerState, action: Action): PassengerState {
         case 'SET_LOADING': return { ...state, isLoading: action.payload, error: null };
         case 'SET_TOKEN_LOADING': return { ...state, tokenLoading: action.payload };
         case 'SET_JOURNEY_LOADING': return { ...state, journeyLoading: action.payload };
+        case 'SET_BOOKINGS_LOADING': return { ...state, bookingsLoading: action.payload };
         case 'SET_PROFILE': return { ...state, profile: action.payload, isLoading: false };
         case 'SET_BALANCE':
             if (!state.profile) return state;
@@ -105,7 +124,15 @@ function reducer(state: PassengerState, action: Action): PassengerState {
         case 'SET_QR': return { ...state, qr: action.payload, tokenLoading: false };
         case 'SET_ACTIVE_JOURNEY': return { ...state, activeJourney: action.payload, journeyLoading: false };
         case 'SET_NOTIFICATIONS': return { ...state, notifications: action.payload };
-        case 'SET_ERROR': return { ...state, error: action.payload, isLoading: false, tokenLoading: false, journeyLoading: false };
+        case 'SET_BOOKINGS': return { ...state, bookings: action.payload, bookingsLoading: false };
+        case 'UPSERT_BOOKING': {
+            const exists = state.bookings.some((b) => b.Id === action.payload.Id);
+            const updated = exists
+                ? state.bookings.map((b) => (b.Id === action.payload.Id ? action.payload : b))
+                : [action.payload, ...state.bookings];
+            return { ...state, bookings: updated };
+        }
+        case 'SET_ERROR': return { ...state, error: action.payload, isLoading: false, tokenLoading: false, journeyLoading: false, bookingsLoading: false };
         case 'CLEAR': return initialState;
         default: return state;
     }
@@ -126,6 +153,10 @@ interface PassengerContextValue extends PassengerState {
     boardJourney: (payload: BoardingPayload) => Promise<BoardingResult>;
     alightJourney: (payload: AlightingPayload) => Promise<AlightingResult>;
     loadNotifications: () => Promise<void>;
+    loadBookings: () => Promise<void>;
+    createJourneyBooking: (payload: CreateBookingPayload) => Promise<CreateBookingResult>;
+    activateBookingPassToken: (bookingId: number, passType: 'QR' | 'Smartcard' | 'Barcode') => Promise<BookingItem>;
+    cancelJourneyBooking: (bookingId: number) => Promise<void>;
     clearError: () => void;
 }
 
@@ -173,28 +204,24 @@ export function PassengerProvider({ children }: { children: React.ReactNode }) {
         }
     }, []);
 
-    /** Load active token. */
+    /** Load passenger token. */
     const loadToken = useCallback(async () => {
         dispatch({ type: 'SET_TOKEN_LOADING', payload: true });
         try {
             const token = await getActiveToken();
             dispatch({ type: 'SET_TOKEN', payload: token });
-        } catch (err: any) {
-            if (err?.response?.status === 404) {
-                dispatch({ type: 'SET_TOKEN', payload: null });
-            } else {
-                dispatch({ type: 'SET_ERROR', payload: 'Failed to load token' });
-            }
+        } catch {
+            dispatch({ type: 'SET_TOKEN', payload: null });
         }
     }, []);
 
-    /** Activate token. */
+    /** Activate / link a token. */
     const activateToken = useCallback(async (payload: ActivateTokenPayload): Promise<string> => {
         dispatch({ type: 'SET_TOKEN_LOADING', payload: true });
         try {
-            const result = await apiActivateToken(payload);
-            dispatch({ type: 'SET_TOKEN', payload: result.token });
-            return result.message;
+            const res = await apiActivateToken(payload);
+            dispatch({ type: 'SET_TOKEN', payload: res.token });
+            return res.message;
         } catch (err: any) {
             const msg = err?.response?.data?.message || 'Token activation failed';
             dispatch({ type: 'SET_ERROR', payload: msg });
@@ -302,6 +329,66 @@ export function PassengerProvider({ children }: { children: React.ReactNode }) {
         }
     }, []);
 
+    /** Load passenger bookings */
+    const loadBookings = useCallback(async () => {
+        dispatch({ type: 'SET_BOOKINGS_LOADING', payload: true });
+        try {
+            const list = await apiGetUserBookings();
+            dispatch({ type: 'SET_BOOKINGS', payload: list });
+        } catch {
+            dispatch({ type: 'SET_BOOKINGS_LOADING', payload: false });
+        }
+    }, []);
+
+    /** Create a new journey booking */
+    const createJourneyBooking = useCallback(async (payload: CreateBookingPayload): Promise<CreateBookingResult> => {
+        dispatch({ type: 'SET_BOOKINGS_LOADING', payload: true });
+        try {
+            const res = await apiCreateBooking(payload);
+            dispatch({ type: 'UPSERT_BOOKING', payload: res.booking });
+            dispatch({ type: 'SET_BALANCE', payload: res.newBalance });
+            dispatch({ type: 'SET_BOOKINGS_LOADING', payload: false });
+            return res;
+        } catch (err: any) {
+            dispatch({ type: 'SET_BOOKINGS_LOADING', payload: false });
+            const msg = err?.response?.data?.message || 'Journey booking failed';
+            dispatch({ type: 'SET_ERROR', payload: msg });
+            throw err;
+        }
+    }, []);
+
+    /** Activate pass method / token for booking */
+    const activateBookingPassToken = useCallback(async (bookingId: number, passType: 'QR' | 'Smartcard' | 'Barcode'): Promise<BookingItem> => {
+        dispatch({ type: 'SET_BOOKINGS_LOADING', payload: true });
+        try {
+            const res = await apiActivateBookingToken(bookingId, passType);
+            dispatch({ type: 'UPSERT_BOOKING', payload: res.booking });
+            dispatch({ type: 'SET_BOOKINGS_LOADING', payload: false });
+            return res.booking;
+        } catch (err: any) {
+            dispatch({ type: 'SET_BOOKINGS_LOADING', payload: false });
+            const msg = err?.response?.data?.message || 'Failed to activate booking token';
+            dispatch({ type: 'SET_ERROR', payload: msg });
+            throw err;
+        }
+    }, []);
+
+    /** Cancel a booking and refund fare */
+    const cancelJourneyBooking = useCallback(async (bookingId: number) => {
+        dispatch({ type: 'SET_BOOKINGS_LOADING', payload: true });
+        try {
+            const res = await apiCancelBooking(bookingId);
+            dispatch({ type: 'UPSERT_BOOKING', payload: res.booking });
+            dispatch({ type: 'SET_BALANCE', payload: res.newBalance });
+            dispatch({ type: 'SET_BOOKINGS_LOADING', payload: false });
+        } catch (err: any) {
+            dispatch({ type: 'SET_BOOKINGS_LOADING', payload: false });
+            const msg = err?.response?.data?.message || 'Failed to cancel booking';
+            dispatch({ type: 'SET_ERROR', payload: msg });
+            throw err;
+        }
+    }, []);
+
     const clearError = useCallback(() => dispatch({ type: 'SET_ERROR', payload: null }), []);
 
     const value = useMemo<PassengerContextValue>(
@@ -319,6 +406,10 @@ export function PassengerProvider({ children }: { children: React.ReactNode }) {
             boardJourney,
             alightJourney,
             loadNotifications,
+            loadBookings,
+            createJourneyBooking,
+            activateBookingPassToken,
+            cancelJourneyBooking,
             clearError,
         }),
         // eslint-disable-next-line react-hooks/exhaustive-deps

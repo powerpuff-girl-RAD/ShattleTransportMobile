@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Central barrel export for all API services.
  *
  * Usage:
@@ -181,3 +181,24 @@ export type {
     Violation,
     ViolationType,
 } from "./inspectorApi";
+
+// Journey Bookings
+export {
+    getBookingRoutes,
+    getRouteBookingDetails,
+    calculateBookingFare,
+    createBooking,
+    activateBookingToken,
+    getUserBookings,
+    getBookingById,
+    cancelBooking,
+} from "./bookingApi";
+export type {
+    BookingRoute,
+    RouteSchedule,
+    BookingItem,
+    CreateBookingPayload,
+    CreateBookingResult,
+    CalculateBookingFarePayload,
+    CalculateBookingFareResult,
+} from "./bookingApi";
