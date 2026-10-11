@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -240,6 +240,7 @@ export default function BuyScreen() {
                         </Text>
                     </Pressable>
 
+                    {/* Activate Token tab hidden / commented as requested
                     <Pressable
                         style={[styles.pillTab, activeTab === 'ActivateToken' ? styles.pillTabActive : undefined]}
                         onPress={() => setActiveTab('ActivateToken')}
@@ -248,6 +249,7 @@ export default function BuyScreen() {
                             Activate Token
                         </Text>
                     </Pressable>
+                    */}
                 </ScrollView>
 
                 {/* ── Tab Content: Day Passes ───────────────────────────── */}
@@ -317,7 +319,7 @@ export default function BuyScreen() {
                     </View>
                 )}
 
-                {/* ── Tab Content: Token Activation ─────────────────────── */}
+                {/* ── Tab Content: Token Activation (commented as requested) ───────
                 {activeTab === 'ActivateToken' && (
                     <View style={styles.activationCard}>
                         {successMsg && (
@@ -366,6 +368,7 @@ export default function BuyScreen() {
                         />
                     </View>
                 )}
+                */}
 
                 {/* ── FARE CALCULATOR ────────────────────────────────────── */}
                 <Text style={styles.sectionHeader}>FARE CALCULATOR</Text>

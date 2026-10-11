@@ -44,6 +44,8 @@ export default function TicketsScreen() {
         profile,
         token,
         qr,
+        bookings,
+        loadBookings,
         tokenLoading,
         error,
         loadToken,
@@ -53,12 +55,38 @@ export default function TicketsScreen() {
 
     const countdown = useQRCountdown(qr?.expiresIn ?? null);
 
-    /** Load token on mount, then immediately generate QR if active. */
+    // Active scheduled bookings that have a QR or can be scanned
+    const todayIso = new Date().toISOString().split('T')[0];
+    const activeBookings = (bookings || []).filter(
+        (b) => b.Status === 'Booked' || b.Status === 'InProgress'
+    );
+
+    // Sort: today first, then upcoming dates
+    const sortedBookings = [...activeBookings].sort((a, b) => {
+        if (a.ScheduleDate !== b.ScheduleDate) {
+            return a.ScheduleDate.localeCompare(b.ScheduleDate);
+        }
+        return a.TimeSlot.localeCompare(b.TimeSlot);
+    });
+
+    // Selected QR view: 'default' (wallet token) or bookingId
+    const [selectedBookingId, setSelectedBookingId] = useState<number | null>(
+        sortedBookings.length > 0 ? sortedBookings[0].Id : null
+    );
+
+    /** Load token & bookings on mount */
     useEffect(() => {
         (async () => {
             await loadToken();
+            await loadBookings();
         })();
     }, []);
+
+    useEffect(() => {
+        if (sortedBookings.length > 0 && selectedBookingId === null) {
+            setSelectedBookingId(sortedBookings[0].Id);
+        }
+    }, [bookings]);
 
     useEffect(() => {
         if (token?.status === 'Active' && !qr) {
@@ -69,23 +97,44 @@ export default function TicketsScreen() {
     const handleRefresh = useCallback(() => {
         clearError();
         refreshQR();
+        loadBookings();
     }, []);
 
     const displayName = profile?.fullName || user?.email || 'Passenger';
     const balance = profile?.account.balance ?? 0;
 
-    // ── No token state ────────────────────────────────────────────────────
-    if (!tokenLoading && !token) {
+    const currentSelectedBooking = sortedBookings.find((b) => b.Id === selectedBookingId);
+
+    // If viewing a booking QR, build its payload
+    const bookingQrValue = currentSelectedBooking
+        ? currentSelectedBooking.QrPayload ||
+          JSON.stringify({
+              bookingId: currentSelectedBooking.Id,
+              bookingRef: currentSelectedBooking.BookingRef,
+              tokenSerial: currentSelectedBooking.TokenSerial,
+              routeNumber: currentSelectedBooking.RouteNumber,
+              boarding: currentSelectedBooking.BoardingStop.StopName,
+              alighting: currentSelectedBooking.AlightingStop.StopName,
+              date: currentSelectedBooking.ScheduleDate,
+              timeSlot: currentSelectedBooking.TimeSlot,
+              passengerCount: currentSelectedBooking.PassengerCount || 1,
+              passengerType: currentSelectedBooking.PassengerType || 'Adult',
+              fare: currentSelectedBooking.FareAmount,
+          })
+        : null;
+
+    // ── No token or booking state ─────────────────────────────────────────
+    if (!tokenLoading && !token && sortedBookings.length === 0) {
         return (
             <View style={styles.root}>
                 <View style={styles.header}>
-                    <Text style={styles.headerTitle}>Your Digital Token</Text>
+                    <Text style={styles.headerTitle}>Your Transit Pass QR</Text>
                 </View>
                 <View style={styles.noTokenContainer}>
                     <Text style={styles.noTokenEmoji}>🎫</Text>
-                    <Text style={styles.noTokenTitle}>No Active Token</Text>
+                    <Text style={styles.noTokenTitle}>No Active Booking or Token</Text>
                     <Text style={styles.noTokenSubtitle}>
-                        Go to the Buy tab to activate your digital token.
+                        Book a scheduled bus journey to generate your dedicated booking QR code.
                     </Text>
                 </View>
             </View>
@@ -107,35 +156,113 @@ export default function TicketsScreen() {
                 contentContainerStyle={styles.scroll}
                 showsVerticalScrollIndicator={false}
             >
-                {/* ── QR card ─────────────────────────────────────────── */}
+                {/* ── Ticket Tabs: Booked Journeys vs General Wallet Token ── */}
+                {sortedBookings.length > 0 && (
+                    <View style={styles.ticketTabsContainer}>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.ticketTabsScroll}>
+                            {sortedBookings.map((b) => {
+                                const isSelected = selectedBookingId === b.Id;
+                                const isToday = b.ScheduleDate === todayIso;
+                                return (
+                                    <Pressable
+                                        key={b.Id}
+                                        style={[styles.ticketTabPill, isSelected ? styles.ticketTabPillActive : undefined]}
+                                        onPress={() => setSelectedBookingId(b.Id)}
+                                    >
+                                        <Text style={[styles.ticketTabTitle, isSelected ? styles.ticketTabTitleActive : undefined]}>
+                                            {isToday ? 'Today' : b.ScheduleDate} · Route {b.RouteNumber}
+                                        </Text>
+                                        <Text style={[styles.ticketTabSub, isSelected ? styles.ticketTabSubActive : undefined]}>
+                                            {b.TimeSlot} ({b.PassengerCount || 1} {b.PassengerType || 'Adult'})
+                                        </Text>
+                                    </Pressable>
+                                );
+                            })}
+
+                            {token && (
+                                <Pressable
+                                    style={[styles.ticketTabPill, selectedBookingId === null ? styles.ticketTabPillActive : undefined]}
+                                    onPress={() => setSelectedBookingId(null)}
+                                >
+                                    <Text style={[styles.ticketTabTitle, selectedBookingId === null ? styles.ticketTabTitleActive : undefined]}>
+                                        Wallet Token
+                                    </Text>
+                                    <Text style={[styles.ticketTabSub, selectedBookingId === null ? styles.ticketTabSubActive : undefined]}>
+                                        #{token.serial}
+                                    </Text>
+                                </Pressable>
+                            )}
+                        </ScrollView>
+                    </View>
+                )}
+
+                {/* ── QR Card ─────────────────────────────────────────── */}
                 <View style={styles.qrCard}>
                     {/* Active badge */}
                     <View style={styles.cardTopRow}>
-                        <View style={[styles.statusBadge, token?.status === 'Active' && styles.statusBadgeActive]}>
+                        <View style={[styles.statusBadge, styles.statusBadgeActive]}>
                             <View style={styles.statusDot} />
-                            <Text style={styles.statusText}>{token?.status?.toUpperCase() ?? 'LOADING'}</Text>
+                            <Text style={styles.statusText}>
+                                {currentSelectedBooking
+                                    ? currentSelectedBooking.Status.toUpperCase()
+                                    : (token?.status?.toUpperCase() ?? 'ACTIVE')}
+                            </Text>
                         </View>
                         <Text style={styles.refreshHint}>
-                            {qr ? `${Math.floor(countdown / 60)}:${String(countdown % 60).padStart(2, '0')}` : '--:--'}
+                            {currentSelectedBooking
+                                ? `Valid on ${currentSelectedBooking.ScheduleDate}`
+                                : qr
+                                ? `${Math.floor(countdown / 60)}:${String(countdown % 60).padStart(2, '0')}`
+                                : '--:--'}
                         </Text>
                     </View>
 
+                    {/* Booking metadata banner if showing booking QR */}
+                    {currentSelectedBooking && (
+                        <View style={styles.bookingBadgeBanner}>
+                            <Text style={styles.bookingBannerRoute}>
+                                Route {currentSelectedBooking.RouteNumber} · {currentSelectedBooking.RouteName}
+                            </Text>
+                            <Text style={styles.bookingBannerStops}>
+                                {currentSelectedBooking.BoardingStop.StopName} → {currentSelectedBooking.AlightingStop.StopName}
+                            </Text>
+                            <Text style={styles.bookingBannerMeta}>
+                                📅 {currentSelectedBooking.ScheduleDate} · ⏰ {currentSelectedBooking.TimeSlot} · 🧑 {currentSelectedBooking.PassengerCount || 1} {currentSelectedBooking.PassengerType || 'Adult'}
+                            </Text>
+                        </View>
+                    )}
+
                     {/* QR code */}
                     <View style={styles.qrWrapper}>
-                        {tokenLoading || !qr ? (
+                        {currentSelectedBooking ? (
+                            <QRCode
+                                value={bookingQrValue || 'BOOKING-TOKEN'}
+                                size={210}
+                                color="#083C2F"
+                                backgroundColor={Colors.white}
+                            />
+                        ) : tokenLoading || !qr ? (
                             <ActivityIndicator size="large" color={Colors.primaryDark} />
                         ) : (
                             <QRCode
                                 value={qr.qrPayload}
-                                size={200}
+                                size={210}
                                 color={Colors.black}
                                 backgroundColor={Colors.white}
                             />
                         )}
                     </View>
 
-                    <Text style={styles.tokenSerial}>Token #{token?.serial}</Text>
-                    <Text style={styles.tokenHint}>Tap in and tap out with this QR</Text>
+                    <Text style={styles.tokenSerial}>
+                        {currentSelectedBooking
+                            ? `Token #${currentSelectedBooking.TokenSerial}`
+                            : `Token #${token?.serial}`}
+                    </Text>
+                    <Text style={styles.tokenHint}>
+                        {currentSelectedBooking
+                            ? `Dedicated pass for ${currentSelectedBooking.PassengerCount || 1} ${currentSelectedBooking.PassengerType || 'Adult'}(s)`
+                            : 'Tap in and tap out with this QR'}
+                    </Text>
 
                     {/* Error state */}
                     {error && (
@@ -202,6 +329,69 @@ const styles = StyleSheet.create({
         padding: Spacing.five,
         gap: Spacing.four,
         paddingBottom: Spacing.twelve,
+    },
+    ticketTabsContainer: {
+        marginBottom: Spacing.xs,
+    },
+    ticketTabsScroll: {
+        flexDirection: 'row',
+        gap: Spacing.sm,
+        paddingBottom: 4,
+    },
+    ticketTabPill: {
+        backgroundColor: Colors.white,
+        borderRadius: Radius.lg,
+        paddingHorizontal: Spacing.md,
+        paddingVertical: 8,
+        borderWidth: 1.5,
+        borderColor: '#E2E8F0',
+        minWidth: 120,
+    },
+    ticketTabPillActive: {
+        backgroundColor: '#E6FAF2',
+        borderColor: '#0F6B56',
+    },
+    ticketTabTitle: {
+        fontSize: FontSize.xs,
+        fontWeight: FontWeight.bold,
+        color: '#64748B',
+    },
+    ticketTabTitleActive: {
+        color: '#0F6B56',
+    },
+    ticketTabSub: {
+        fontSize: 10,
+        color: '#94A3B8',
+        marginTop: 2,
+    },
+    ticketTabSubActive: {
+        color: '#0F6B56',
+        fontWeight: FontWeight.semibold,
+    },
+    bookingBadgeBanner: {
+        backgroundColor: '#F0FDF4',
+        borderRadius: Radius.lg,
+        borderWidth: 1,
+        borderColor: '#BBF7D0',
+        padding: Spacing.sm,
+        alignSelf: 'stretch',
+        alignItems: 'center',
+        gap: 2,
+    },
+    bookingBannerRoute: {
+        fontSize: FontSize.sm,
+        fontWeight: FontWeight.bold,
+        color: '#166534',
+    },
+    bookingBannerStops: {
+        fontSize: FontSize.xs,
+        fontWeight: FontWeight.semibold,
+        color: '#15803D',
+    },
+    bookingBannerMeta: {
+        fontSize: 10,
+        color: '#14532D',
+        marginTop: 2,
     },
     qrCard: {
         backgroundColor: Colors.white,
