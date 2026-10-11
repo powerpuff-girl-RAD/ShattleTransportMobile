@@ -49,7 +49,7 @@ export default function BookingTokenScreen() {
     }>();
 
     const bookingId = Number(params.bookingId);
-    const { activateBookingPassToken, bookingsLoading } = usePassenger();
+    const { activateBookingPassToken, bookingsLoading, profile } = usePassenger();
 
     const [booking, setBooking] = useState<BookingItem | null>(null);
     const [loadingBooking, setLoadingBooking] = useState(false);
@@ -107,22 +107,10 @@ export default function BookingTokenScreen() {
         ? `${displayAdultCount} Adult${displayAdultCount > 1 ? 's' : ''}, ${displayMinorCount} Minor${displayMinorCount > 1 ? 's' : ''}`
         : `${displayAdultCount} Adult${displayAdultCount > 1 ? 's' : ''} (Standard)`;
 
-    // QR value encodes unique booking token payload
+    // QR value encodes ONLY booking token and userId
     const qrValue = booking?.QrPayload || JSON.stringify({
-        bookingId: booking?.Id || bookingId,
-        bookingRef: displayBookingRef,
-        tokenSerial: displayTokenSerial,
-        routeNumber: displayRouteNumber,
-        boarding: displayBoarding,
-        alighting: displayAlighting,
-        date: displayDate,
-        timeSlot: displayTimeSlot,
-        adultCount: displayAdultCount,
-        minorCount: displayMinorCount,
-        passengerCount: displayPassengerCount,
-        passengerType: displayPassengerType,
-        fare: displayFare,
-        passType: selectedPass,
+        bookingToken: booking?.TokenSerial || displayTokenSerial,
+        userId: Number(booking?.UserId || profile?.userId || 1),
     });
 
     const isTokenActive = booking?.TokenStatus === 'Active';
