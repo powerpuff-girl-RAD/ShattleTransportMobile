@@ -100,20 +100,10 @@ export default function BookingDetailsScreen() {
         ? `${booking.AdultCount || 1} Adult${(booking.AdultCount || 1) > 1 ? 's' : ''}, ${booking.MinorCount} Minor${booking.MinorCount > 1 ? 's' : ''}`
         : `${booking.AdultCount || booking.PassengerCount || 1} Adult${(booking.AdultCount || booking.PassengerCount || 1) > 1 ? 's' : ''} (Standard)`;
 
+    // QR value encodes ONLY booking token and userId
     const qrValue = booking.QrPayload || JSON.stringify({
-        bookingId: booking.Id,
-        bookingRef: booking.BookingRef,
-        tokenSerial: booking.TokenSerial,
-        routeNumber: booking.RouteNumber,
-        boarding: booking.BoardingStop.StopName,
-        alighting: booking.AlightingStop.StopName,
-        date: booking.ScheduleDate,
-        timeSlot: booking.TimeSlot,
-        adultCount: booking.AdultCount ?? 1,
-        minorCount: booking.MinorCount ?? 0,
-        passengerCount: booking.PassengerCount || 1,
-        passengerType: booking.PassengerType || 'Adult',
-        fare: booking.FareAmount,
+        bookingToken: booking.TokenSerial,
+        userId: Number(booking.UserId),
     });
 
     return (

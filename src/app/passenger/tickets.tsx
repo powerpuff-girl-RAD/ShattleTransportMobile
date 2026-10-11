@@ -105,21 +105,12 @@ export default function TicketsScreen() {
 
     const currentSelectedBooking = sortedBookings.find((b) => b.Id === selectedBookingId);
 
-    // If viewing a booking QR, build its payload
+    // If viewing a booking QR, build its payload (ONLY bookingToken and userId)
     const bookingQrValue = currentSelectedBooking
         ? currentSelectedBooking.QrPayload ||
           JSON.stringify({
-              bookingId: currentSelectedBooking.Id,
-              bookingRef: currentSelectedBooking.BookingRef,
-              tokenSerial: currentSelectedBooking.TokenSerial,
-              routeNumber: currentSelectedBooking.RouteNumber,
-              boarding: currentSelectedBooking.BoardingStop.StopName,
-              alighting: currentSelectedBooking.AlightingStop.StopName,
-              date: currentSelectedBooking.ScheduleDate,
-              timeSlot: currentSelectedBooking.TimeSlot,
-              passengerCount: currentSelectedBooking.PassengerCount || 1,
-              passengerType: currentSelectedBooking.PassengerType || 'Adult',
-              fare: currentSelectedBooking.FareAmount,
+              bookingToken: currentSelectedBooking.TokenSerial,
+              userId: Number(currentSelectedBooking.UserId || profile?.userId || user?.id || 1),
           })
         : null;
 
