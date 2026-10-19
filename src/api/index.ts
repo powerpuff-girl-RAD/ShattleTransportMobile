@@ -2,8 +2,8 @@
  * Central barrel export for all API services.
  *
  * Usage:
- *   import { login, getRoutes, getSchedules } from '@/api';
- *   import type { AuthUser, Route, Schedule } from '@/api';
+ *   import { login, getRoutes, getSchedules, topUpAccount } from '@/api';
+ *   import type { AuthUser, Route, Schedule, TopUpResponse } from '@/api';
  */
 
 // Core client & token keys
@@ -89,3 +89,116 @@ export type {
 // Health
 export { checkHealth } from "./healthApi";
 export type { HealthStatus } from "./healthApi";
+
+// Passenger profile & wallet
+export {
+    getMyProfile,
+    updateMyProfile,
+    changePassword,
+    topUpAccount,
+    getTopUpHistory,
+    getTopUpReceipt,
+} from "./passengerApi";
+export type {
+    PassengerProfileData,
+    PassengerAccount,
+    UpdateProfilePayload,
+    TopUpPayload,
+    TopUpTransaction,
+    TopUpResponse,
+} from "./passengerApi";
+
+// Digital token
+export {
+    activateToken,
+    getActiveToken,
+    generateQR,
+    deactivateToken,
+} from "./tokenApi";
+export type {
+    DigitalToken,
+    TokenType,
+    TokenStatus,
+    QRGenerationResult,
+    ActivateTokenPayload,
+} from "./tokenApi";
+// Journey & Ticketing
+export {
+    boardJourney,
+    alightJourney,
+    getActiveJourney,
+    getJourneyHistory,
+    getFareEstimate,
+    getNotifications,
+    markNotificationRead,
+} from "./journeyApi";
+export type {
+    Journey,
+    JourneyStopInfo,
+    BoardingPayload,
+    BoardingResult,
+    AlightingPayload,
+    AlightingResult,
+    FareEstimatePayload,
+    FareEstimateResult,
+    NotificationItem,
+} from "./journeyApi";
+
+// Inspector (all live backend endpoints)
+export {
+    getDashboard,
+    startShift,
+    endShift,
+    validateQR,
+    inspect,
+    getInspections,
+    getInspection,
+    recordViolation,
+    getViolations,
+    getStats,
+    getSchedule,
+    changePassword as changeInspectorPassword,
+} from "./inspectorApi";
+export type {
+    Inspection,
+    InspectionCheck,
+    InspectionDetail,
+    InspectionList,
+    InspectionOutcome,
+    InspectionQuery,
+    InspectionResult,
+    InspectInput,
+    InspectionLocation,
+    InspectorDashboard,
+    InspectorProfile,
+    InspectorShift,
+    InspectorStats,
+    QRValidationResult,
+    RecordViolationPayload,
+    ScheduledShift,
+    StatsPeriod,
+    TodayStats,
+    Violation,
+    ViolationType,
+} from "./inspectorApi";
+
+// Journey Bookings
+export {
+    getBookingRoutes,
+    getRouteBookingDetails,
+    calculateBookingFare,
+    createBooking,
+    activateBookingToken,
+    getUserBookings,
+    getBookingById,
+    cancelBooking,
+} from "./bookingApi";
+export type {
+    BookingRoute,
+    RouteSchedule,
+    BookingItem,
+    CreateBookingPayload,
+    CreateBookingResult,
+    CalculateBookingFarePayload,
+    CalculateBookingFareResult,
+} from "./bookingApi";
