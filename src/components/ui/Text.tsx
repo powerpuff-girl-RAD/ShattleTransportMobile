@@ -1,4 +1,4 @@
-import { StyleSheet, Text as RNText, type TextStyle, type TextProps } from 'react-native';
+import { StyleSheet, Text as RNText, type TextStyle, type TextProps, type StyleProp } from 'react-native';
 import { Colors, FontSize, FontWeight, LetterSpacing } from '@/constants/theme';
 
 // ─── Variant definitions ───────────────────────────────────────────────────
@@ -16,7 +16,7 @@ interface AppTextProps extends TextProps {
   variant?: Variant;
   /** Override the font colour. */
   color?: string;
-  style?: TextStyle | TextStyle[];
+  style?: StyleProp<TextStyle>;
 }
 
 // ─── Component ─────────────────────────────────────────────────────────────
