@@ -11,7 +11,9 @@ import {
     getDashboard,
     inspect as apiInspect,
     recordViolation as apiRecordViolation,
+    scanTicket as apiScanTicket,
     startShift as apiStartShift,
+    validateTicket as apiValidateTicket,
 } from '@/api/inspectorApi';
 import type {
     Inspection,
@@ -20,9 +22,22 @@ import type {
     InspectorProfile,
     InspectorShift,
     RecordViolationPayload,
+    ScanResult,
+    ShiftSettlement,
     TodayStats,
+    ValidateResult,
     Violation,
 } from '@/api/inspectorApi';
+
+/**
+ * The latest booking-ticket action, read by the Ticket Result screen.
+ * `id` changes on every scan so the sound / vibration plays each time.
+ */
+export type TicketOutcome =
+    | { id: number; kind: 'scan'; result: ScanResult }
+    | { id: number; kind: 'validate'; result: ValidateResult }
+    // The backend refused a scan, e.g. WRONG_ROUTE, ALREADY_USED, OUTSTANDING_DEBT
+    | { id: number; kind: 'rejected'; mode: 'scan' | 'validate'; code: string; message: string };
 
 // ─── State ────────────────────────────────────────────────────────────────
 // Only state that several screens share lives here. Screens that just show a
@@ -35,6 +50,10 @@ interface InspectorState {
     recentInspections: Inspection[];
     /** The most recent scan result — read by the Inspection Result screen. */
     lastOutcome: InspectionOutcome | null;
+    /** The most recent Scan / Validate result — read by the Ticket Result screen. */
+    lastTicket: TicketOutcome | null;
+    /** Charges made when the last shift ended (missed tap-outs). */
+    lastSettlement: ShiftSettlement | null;
     isLoading: boolean;
     error: string | null;
 }
@@ -45,6 +64,8 @@ const initialState: InspectorState = {
     todayStats: { total: 0, valid: 0, violations: 0 },
     recentInspections: [],
     lastOutcome: null,
+    lastTicket: null,
+    lastSettlement: null,
     isLoading: false,
     error: null,
 };
@@ -58,6 +79,8 @@ type Action =
     | { type: 'SET_SHIFT'; payload: InspectorShift }
     | { type: 'ADD_INSPECTION'; payload: InspectionOutcome }
     | { type: 'VIOLATION_RECORDED'; payload: Violation }
+    | { type: 'SET_TICKET'; payload: TicketOutcome }
+    | { type: 'SET_SETTLEMENT'; payload: ShiftSettlement | null }
     | { type: 'SET_ERROR'; payload: string | null };
 
 // Reducer: the only place state changes. Each action returns a NEW state object.
@@ -96,6 +119,10 @@ function reducer(state: InspectorState, action: Action): InspectorState {
                     : null,
             };
         }
+        case 'SET_TICKET':
+            return { ...state, lastTicket: action.payload };
+        case 'SET_SETTLEMENT':
+            return { ...state, lastSettlement: action.payload };
         case 'SET_ERROR':
             return { ...state, error: action.payload, isLoading: false };
         default:
@@ -112,8 +139,11 @@ export function messageFrom(err: any, fallback: string): string {
 
 interface InspectorContextValue extends InspectorState {
     loadDashboard: () => Promise<void>;
-    toggleShift: () => Promise<void>;
+    /** Resolves with the settlement when a shift was ended, otherwise null. */
+    toggleShift: () => Promise<ShiftSettlement | null>;
     inspectToken: (input: InspectInput) => Promise<InspectionOutcome>;
+    scanTicket: (input: InspectInput) => Promise<TicketOutcome>;
+    validateTicket: (input: InspectInput) => Promise<TicketOutcome>;
     recordViolation: (payload: RecordViolationPayload) => Promise<Violation>;
 }
 
@@ -137,10 +167,17 @@ export function InspectorProvider({ children }: { children: React.ReactNode }) {
 
     /** Starts the shift if off duty, ends it if on duty. Throws so the screen can react. */
     const toggleShift = useCallback(async () => {
-        if (!state.shift) return;
+        if (!state.shift) return null;
         try {
-            const shift = state.shift.onDuty ? await apiEndShift() : await apiStartShift();
+            if (!state.shift.onDuty) {
+                dispatch({ type: 'SET_SHIFT', payload: await apiStartShift() });
+                return null;
+            }
+            // Ending the shift also charges passengers who were never tapped out
+            const { shift, settlement } = await apiEndShift();
             dispatch({ type: 'SET_SHIFT', payload: shift });
+            dispatch({ type: 'SET_SETTLEMENT', payload: settlement });
+            return settlement;
         } catch (err) {
             dispatch({ type: 'SET_ERROR', payload: messageFrom(err, 'Failed to update shift') });
             throw err;
@@ -157,6 +194,29 @@ export function InspectorProvider({ children }: { children: React.ReactNode }) {
         return outcome;
     }, []);
 
+    /**
+     * Scan / Validate a booking QR. A refusal from the backend (it sends a reason
+     * code) becomes a 'rejected' outcome for the result screen; network errors
+     * are thrown so the Scan screen can show them and unlock scanning.
+     */
+    const runTicket = useCallback(async (mode: 'scan' | 'validate', input: InspectInput) => {
+        let outcome: TicketOutcome;
+        try {
+            outcome = mode === 'scan'
+                ? { id: Date.now(), kind: 'scan', result: await apiScanTicket(input) }
+                : { id: Date.now(), kind: 'validate', result: await apiValidateTicket(input) };
+        } catch (err: any) {
+            const code = err?.response?.data?.code;
+            if (!code) throw err;
+            outcome = { id: Date.now(), kind: 'rejected', mode, code, message: messageFrom(err, 'Rejected') };
+        }
+        dispatch({ type: 'SET_TICKET', payload: outcome });
+        return outcome;
+    }, []);
+
+    const scanTicket = useCallback((input: InspectInput) => runTicket('scan', input), [runTicket]);
+    const validateTicket = useCallback((input: InspectInput) => runTicket('validate', input), [runTicket]);
+
     /** Records a violation for an invalid inspection. Throws so the form can show the error. */
     const recordViolation = useCallback(async (payload: RecordViolationPayload) => {
         const violation = await apiRecordViolation(payload);
@@ -165,8 +225,8 @@ export function InspectorProvider({ children }: { children: React.ReactNode }) {
     }, []);
 
     const value = useMemo<InspectorContextValue>(
-        () => ({ ...state, loadDashboard, toggleShift, inspectToken, recordViolation }),
-        [state, loadDashboard, toggleShift, inspectToken, recordViolation]
+        () => ({ ...state, loadDashboard, toggleShift, inspectToken, scanTicket, validateTicket, recordViolation }),
+        [state, loadDashboard, toggleShift, inspectToken, scanTicket, validateTicket, recordViolation]
     );
 
     return (

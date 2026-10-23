@@ -71,6 +71,8 @@ export default function ViolationsScreen() {
                 renderItem={({ item }) => (
                     <Pressable
                         style={({ pressed }) => [styles.card, pressed && styles.pressed]}
+                        // Missed tap-out violations are recorded by shift-end settlement, with no inspection to open
+                        disabled={item.inspectionId === null}
                         onPress={() => router.push({ pathname: '/inspector/inspection/[id]', params: { id: String(item.inspectionId) } })}
                         accessibilityRole="button"
                     >

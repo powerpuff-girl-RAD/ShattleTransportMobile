@@ -9,10 +9,12 @@ interface Props {
     /** Short line under VALID / INVALID, e.g. the violation type. */
     caption?: string | null;
     size?: 'large' | 'small';
+    /** Replaces the VALID / INVALID word, e.g. "Tapped In". */
+    label?: string;
 }
 
 /** Big green tick / red cross with VALID or INVALID — the visual feedback of a scan. */
-export function ResultBadge({ result, caption, size = 'large' }: Props) {
+export function ResultBadge({ result, caption, size = 'large', label }: Props) {
     const isValid = result === 'Valid';
     const circle = size === 'large' ? 112 : 72;
     const color = isValid ? Colors.primaryDark : Colors.error;
@@ -28,7 +30,7 @@ export function ResultBadge({ result, caption, size = 'large' }: Props) {
                 <Icon name={isValid ? 'check' : 'cross'} color={color} size={circle * 0.6} />
             </View>
             <Text style={[styles.result, { color }, size === 'small' && styles.resultSmall]}>
-                {isValid ? 'Valid' : 'Invalid'}
+                {label ?? (isValid ? 'Valid' : 'Invalid')}
             </Text>
             {caption ? <Text style={styles.caption}>{caption}</Text> : null}
         </View>

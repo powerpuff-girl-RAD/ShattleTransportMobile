@@ -19,16 +19,32 @@ import { Colors, FontSize, FontWeight, Radius, Spacing } from '@/constants/theme
 import { useInspector } from '@/store/inspectorStore';
 
 const FRAME_SIZE = 240;
+const TOP_BAR_HEIGHT = Spacing.three + 40 + Spacing.three;
+
+/**
+ * What a scan does:
+ *  - scan:     booking QR → 1st scan taps in, 2nd taps out and charges the fare (changes state)
+ *  - validate: booking QR → VALID / INVALID for this route, read-only
+ *  - inspect:  any token → full ticket check, saved for History and violations
+ */
+type ScanMode = 'scan' | 'validate' | 'inspect';
+
+const MODES: { value: ScanMode; label: string; hint: string }[] = [
+    { value: 'scan', label: 'Tap In / Out', hint: 'Scan a booking QR to tap the passenger in, or out at their stop' },
+    { value: 'validate', label: 'Validate', hint: 'Check a booking QR for this route — nothing is saved or charged' },
+    { value: 'inspect', label: 'Inspect', hint: "Point the camera at the passenger's QR code" },
+];
 
 /**
  * Scan Passenger Token.
  * QR codes are read with the camera; smartcards and barcode tickets are
- * typed in by serial ("Enter token ID manually"). Both go to the same
- * backend endpoint, POST /api/inspector/inspect.
+ * typed in by serial ("Enter token ID manually"). The mode chosen at the
+ * top decides the backend endpoint: /scan, /validate or /inspect.
  */
 export default function ScanScreen() {
     const insets = useSafeAreaInsets();
-    const { shift, inspectToken } = useInspector();
+    const { shift, inspectToken, scanTicket, validateTicket } = useInspector();
+    const [mode, setMode] = useState<ScanMode>('scan');
     const [permission, requestPermission] = useCameraPermissions();
 
     const [isFocused, setIsFocused] = useState(false);
@@ -60,17 +76,21 @@ export default function ScanScreen() {
         setIsChecking(true);
         setError(null);
         try {
-            await inspectToken(input);
+            if (mode === 'inspect') {
+                await inspectToken(input);
+            } else {
+                await (mode === 'scan' ? scanTicket : validateTicket)(input);
+            }
             setShowManual(false);
             setSerial('');
-            router.push('/inspector/result');
+            router.push(mode === 'inspect' ? '/inspector/result' : '/inspector/ticket-result');
         } catch (err: any) {
             setError(err?.response?.data?.message || 'Could not reach the server. Please try again.');
             scanLock.current = false;
         } finally {
             setIsChecking(false);
         }
-    }, [inspectToken]);
+    }, [mode, inspectToken, scanTicket, validateTicket]);
 
     const handleBarcodeScanned = useCallback(({ data }: BarcodeScanningResult) => {
         if (scanLock.current) return;
@@ -141,6 +161,25 @@ export default function ScanScreen() {
                 </Pressable>
             </View>
 
+            {/* ── Mode: Tap In / Out · Validate · Inspect ─────────────── */}
+            <View style={[styles.modeBar, { top: insets.top + TOP_BAR_HEIGHT }]} accessibilityRole="tablist">
+                {MODES.map((m) => {
+                    const active = m.value === mode;
+                    return (
+                        <Pressable
+                            key={m.value}
+                            style={[styles.modeButton, active && styles.modeButtonActive]}
+                            onPress={() => { setMode(m.value); setError(null); }}
+                            disabled={isChecking}
+                            accessibilityRole="tab"
+                            accessibilityState={{ selected: active }}
+                        >
+                            <Text style={[styles.modeLabel, active && styles.modeLabelActive]}>{m.label}</Text>
+                        </Pressable>
+                    );
+                })}
+            </View>
+
             {/* ── Scanning frame ──────────────────────────────────────── */}
             <View style={styles.center} pointerEvents="none">
                 <View style={styles.frame}>
@@ -151,7 +190,7 @@ export default function ScanScreen() {
                     {isChecking ? <ActivityIndicator color={Colors.white} size="large" /> : null}
                 </View>
                 <Text style={styles.hint}>
-                    {isChecking ? 'Checking token…' : "Point the camera at the passenger's QR code"}
+                    {isChecking ? 'Checking token…' : MODES.find((m) => m.value === mode)?.hint}
                 </Text>
                 {error ? <Text style={styles.error}>{error}</Text> : null}
             </View>
@@ -246,6 +285,21 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center',
     },
     roundButtonOn: { backgroundColor: Colors.white },
+
+    // Sits right under the top bar (padding + 40px torch button + padding)
+    modeBar: {
+        position: 'absolute', left: 0, right: 0,
+        flexDirection: 'row', gap: Spacing.two,
+        paddingHorizontal: Spacing.five, paddingBottom: Spacing.three,
+        backgroundColor: 'rgba(8,60,47,0.85)',
+    },
+    modeButton: {
+        flex: 1, paddingVertical: Spacing.two, borderRadius: Radius.md, alignItems: 'center',
+        backgroundColor: 'rgba(255,255,255,0.12)',
+    },
+    modeButtonActive: { backgroundColor: Colors.orange },
+    modeLabel: { color: Colors.textSecondary, fontSize: FontSize.sm, fontWeight: FontWeight.semibold },
+    modeLabelActive: { color: Colors.white },
 
     center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: Spacing.four, paddingHorizontal: Spacing.six },
     frame: { width: FRAME_SIZE, height: FRAME_SIZE, alignItems: 'center', justifyContent: 'center' },

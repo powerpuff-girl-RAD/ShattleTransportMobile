@@ -23,17 +23,19 @@ import { useInspector } from '@/store/inspectorStore';
  * and the three most recent inspections.
  */
 export default function InspectorDashboard() {
-    const { profile, shift, recentInspections, todayStats, isLoading, error, loadDashboard, toggleShift } = useInspector();
+    const { profile, shift, recentInspections, todayStats, isLoading, error, loadDashboard, toggleShift, lastSettlement } = useInspector();
     const [showShiftModal, setShowShiftModal] = useState(false);
     const [isTogglingShift, setIsTogglingShift] = useState(false);
+    const [showSettlement, setShowSettlement] = useState(false);
 
     useEffect(() => { loadDashboard(); }, [loadDashboard]);
 
     const handleConfirmShift = useCallback(async () => {
         setIsTogglingShift(true);
         try {
-            await toggleShift();
+            const settlement = await toggleShift();
             setShowShiftModal(false);
+            setShowSettlement(settlement !== null);
         } catch (err) {
             console.error('Shift update error:', err);
         } finally {
@@ -63,6 +65,42 @@ export default function InspectorDashboard() {
                 }
             >
                 {error ? <Text style={styles.error}>{error}</Text> : null}
+
+                {/* ── Shift-end settlement (missed tap-outs) ────────────── */}
+                {showSettlement && lastSettlement ? (
+                    <View style={styles.card}>
+                        <View style={styles.cardHeader}>
+                            <Text style={styles.cardTitle}>Shift Settled</Text>
+                            <Pressable onPress={() => setShowSettlement(false)} accessibilityRole="button" accessibilityLabel="Dismiss">
+                                <Icon name="cross" color={Colors.textDarkSecondary} size={20} />
+                            </Pressable>
+                        </View>
+                        {lastSettlement.settledCount === 0 ? (
+                            <Text style={styles.emptyText}>Every passenger was tapped out. No penalties charged.</Text>
+                        ) : (
+                            <>
+                                <Text style={styles.settleText}>
+                                    {lastSettlement.settledCount} passenger{lastSettlement.settledCount > 1 ? 's were' : ' was'} not
+                                    tapped out and {lastSettlement.settledCount > 1 ? 'were' : 'was'} charged the whole-route fare + 10%.
+                                </Text>
+                                {lastSettlement.journeys.map((j) => (
+                                    <InfoRow
+                                        key={j.journeyId}
+                                        label={`#${j.tokenSerial}`}
+                                        value={`LKR ${j.chargedAmount.toFixed(2)}${j.paymentStatus === 'Outstanding' ? ' (owes)' : ''}`}
+                                        valueColor={j.paymentStatus === 'Outstanding' ? Colors.error : Colors.textDark}
+                                    />
+                                ))}
+                                <InfoRow label="Total charged" value={`LKR ${lastSettlement.totalCharged.toFixed(2)}`} />
+                            </>
+                        )}
+                        {lastSettlement.failedCount > 0 ? (
+                            <Text style={styles.error}>
+                                {lastSettlement.failedCount} could not be charged. They will be retried next time.
+                            </Text>
+                        ) : null}
+                    </View>
+                ) : null}
 
                 {/* ── Today's stats ─────────────────────────────────────── */}
                 <View style={styles.statsRow}>
@@ -158,7 +196,7 @@ export default function InspectorDashboard() {
                 title={onDuty ? 'End Shift' : 'Start Shift'}
                 message={
                     onDuty
-                        ? 'End your shift now? You will not be able to scan tokens until you start a new shift.'
+                        ? 'End your shift now? Passengers you tapped in but did not tap out will be charged the whole-route fare + 10%.'
                         : `Start your shift on Route ${shift?.routeNumber ?? ''}?`
                 }
                 confirmLabel={onDuty ? 'End Shift' : 'Start'}
@@ -186,6 +224,7 @@ const styles = StyleSheet.create({
         fontSize: FontSize.base, fontWeight: FontWeight.bold, color: Colors.textDark,
         textTransform: 'uppercase',
     },
+    settleText: { fontSize: FontSize.sm, color: Colors.textDarkSecondary, marginBottom: Spacing.two },
     shiftHours: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
     shiftHoursText: { fontSize: FontSize.sm, fontWeight: FontWeight.bold, color: Colors.textDark },
     shiftButton: {

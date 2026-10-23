@@ -12,6 +12,7 @@ export type ViolationType =
     | 'Insufficient Credit'
     | 'Invalid Token'
     | 'Invalid Journey'
+    | 'Missed Tap-Out'      // recorded automatically by shift-end settlement
     | 'Other';
 
 export type InspectionLocation = 'En Route' | 'At Stop' | 'Terminal';
@@ -70,7 +71,8 @@ export interface InspectorDashboard {
 
 export interface Violation {
     id: number;
-    inspectionId: number;
+    /** null for violations recorded automatically (missed tap-out at shift end) */
+    inspectionId: number | null;
     tokenSerial: string;
     violationType: ViolationType;
     location: InspectionLocation;
@@ -172,10 +174,99 @@ export async function startShift(): Promise<InspectorShift> {
     return res.data.shift;
 }
 
-/** POST /api/inspector/shift/end — fails with 409 if no shift is active */
-export async function endShift(): Promise<InspectorShift> {
-    const res = await apiClient.post<{ success: boolean; shift: InspectorShift }>('/inspector/shift/end');
-    return res.data.shift;
+/**
+ * POST /api/inspector/shift/end — fails with 409 if no shift is active.
+ * Ending the shift also settles it: passengers still tapped in are charged
+ * the whole-route fare + 10%. `settlement` is null if that step failed.
+ */
+export async function endShift(): Promise<{ shift: InspectorShift; settlement: ShiftSettlement | null }> {
+    const res = await apiClient.post<{ success: boolean; shift: InspectorShift; settlement: ShiftSettlement | null }>('/inspector/shift/end');
+    return { shift: res.data.shift, settlement: res.data.settlement ?? null };
+}
+
+// ─── Booking tickets: Scan (tap-in / tap-out) and Validate (live backend) ─
+
+export interface TicketBooking {
+    bookingId: number;
+    bookingRef: string;
+    tokenSerial: string;
+    routeNumber: string;
+    routeName: string;
+    boardingStop: string | null;
+    alightingStop: string | null;
+    travelDate: string | null;
+    adultCount: number;
+    minorCount: number;
+    fareAmount: number | null;
+}
+
+export type PaymentStatus = 'Paid' | 'Outstanding';
+
+/** What POST /api/inspector/scan returns. */
+export interface ScanResult {
+    action: 'TAP_IN' | 'TAP_OUT';
+    message: string;
+    booking: TicketBooking;
+    journey: { id: number; status: string; entryAt: string; exitAt: string | null };
+    // Tap-out only
+    fare?: number;
+    balance?: number;
+    paymentStatus?: PaymentStatus;
+    outstandingAmount?: number;
+}
+
+/** What POST /api/inspector/validate returns. Read-only: nothing is saved or charged. */
+export interface ValidateResult {
+    valid: boolean;
+    code: 'VALID' | 'WRONG_ROUTE' | 'EXPIRED' | 'ALREADY_USED' | 'UNKNOWN_QR' | 'NOT_ACTIVE';
+    reason: string | null;
+    message: string;
+    tokenSerial: string | null;
+    booking: TicketBooking | null;
+    journeyStatus: 'NotTappedIn' | 'InProgress' | 'Completed' | 'AutoClosedPenalty';
+    route: { routeNumber: string; routeName: string; busNumber: string };
+}
+
+export interface SettledJourney {
+    journeyId: number;
+    tokenSerial: string;
+    fullRouteFare: number;
+    penaltyAmount: number;
+    chargedAmount: number;
+    paymentStatus: PaymentStatus;
+    outstandingAmount: number;
+}
+
+export interface ShiftSettlement {
+    shiftId: number;
+    settledCount: number;
+    failedCount: number;
+    totalCharged: number;
+    journeys: SettledJourney[];
+}
+
+/**
+ * POST /api/inspector/scan — 1st scan taps in, 2nd taps out and charges the
+ * booked fare, any later scan is rejected (409 ALREADY_USED). Rejections are
+ * thrown with response.data.code, e.g. WRONG_ROUTE, EXPIRED, OUTSTANDING_DEBT.
+ */
+export async function scanTicket(input: InspectInput): Promise<ScanResult> {
+    const res = await apiClient.post<{ success: boolean } & ScanResult>('/inspector/scan', input);
+    const { success: _ignored, ...result } = res.data;
+    return result;
+}
+
+/** POST /api/inspector/validate — VALID / INVALID for this shift's route. Changes nothing. */
+export async function validateTicket(input: InspectInput): Promise<ValidateResult> {
+    const res = await apiClient.post<{ success: boolean } & ValidateResult>('/inspector/validate', input);
+    const { success: _ignored, ...result } = res.data;
+    return result;
+}
+
+/** POST /api/inspector/shifts/:id/settle — re-runs settlement for an ended shift (safe to repeat). */
+export async function settleShift(shiftId: number): Promise<ShiftSettlement> {
+    const res = await apiClient.post<{ success: boolean; settlement: ShiftSettlement }>(`/inspector/shifts/${shiftId}/settle`);
+    return res.data.settlement;
 }
 
 // ─── Inspection (live backend, used by the Scan screen) ───────────────────

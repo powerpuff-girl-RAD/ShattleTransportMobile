@@ -40,6 +40,7 @@ export default function InspectorLayout() {
 
                 {/* Screens opened from other screens — not shown as tabs */}
                 <Tabs.Screen name="result" options={HIDDEN} />
+                <Tabs.Screen name="ticket-result" options={HIDDEN} />
                 <Tabs.Screen name="violation" options={HIDDEN} />
                 <Tabs.Screen name="inspection/[id]" options={HIDDEN} />
                 <Tabs.Screen name="violations" options={HIDDEN} />
