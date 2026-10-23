@@ -11,7 +11,7 @@ import {
 
 import { BrandLogo } from '@/components/BrandLogo';
 import { Button, Input, Screen, Text } from '@/components/ui';
-import { Colors, Layout, Spacing } from '@/constants/theme';
+import { Colors, FontSize, Layout, Spacing } from '@/constants/theme';
 import { useAuth } from '@/store/authStore';
 import { getErrorMessage } from '@/utils/api';
 
@@ -103,8 +103,22 @@ export default function Login() {
 
           {/* ── Form ────────────────────────────────────────────────── */}
           <View style={styles.form}>
+
+            <Text
+              style={{
+                color: "#f9f9f9",
+                fontSize: FontSize.xs,
+                fontWeight: "600",
+                letterSpacing: 0.8,
+                textTransform: "uppercase",
+                marginTop: Spacing.one,
+              }}
+            >
+              EMAIL ADDRESS
+            </Text>
             <Input
-              label="Email address"
+
+              // label="Email address"
               placeholder="you@example.com"
               keyboardType="email-address"
               autoCapitalize="none"
@@ -115,8 +129,20 @@ export default function Login() {
               error={emailErr}
             />
 
+            <Text
+              style={{
+                color: "#f9f9f9",
+                fontSize: FontSize.xs,
+                fontWeight: "600",
+                letterSpacing: 0.8,
+                textTransform: "uppercase",
+                marginTop: Spacing.four,
+              }}
+            >
+              Password            </Text>
+
             <Input
-              label="Password"
+              // label="Password"
               placeholder="••••••••"
               secureTextEntry
               autoComplete="password"
@@ -187,7 +213,7 @@ const styles = StyleSheet.create({
     marginTop: Spacing.two,
   },
   form: {
-    gap: Spacing.four,
+    gap: Spacing.xs,
   },
   apiError: {
     textAlign: 'center',
